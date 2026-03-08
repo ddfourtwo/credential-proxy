@@ -54,7 +54,7 @@ class AuditLogger {
             let appSupport = FileManager.default.urls(
                 for: .applicationSupportDirectory, in: .userDomainMask
             ).first!.path
-            self.logFilePath = "\(appSupport)/CredentialProxy/logs/secrets-audit.log"
+            self.logFilePath = "\(appSupport)/credential-proxy/audit.log"
         }
     }
 

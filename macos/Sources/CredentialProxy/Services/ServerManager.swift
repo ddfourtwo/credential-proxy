@@ -21,7 +21,7 @@ final class ServerManager: ObservableObject {
         let server = HTTPServer(port: port)
 
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dataDir = appSupport.appendingPathComponent("CredentialProxy").path
+        let dataDir = appSupport.appendingPathComponent("credential-proxy").path
         try? FileManager.default.createDirectory(atPath: dataDir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
 
         let auditLogger = AuditLogger(logFilePath: "\(dataDir)/audit.log")
