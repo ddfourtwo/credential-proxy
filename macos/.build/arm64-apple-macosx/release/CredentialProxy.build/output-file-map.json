@@ -1,0 +1,55 @@
+{
+  "": {
+    "dependencies": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/CredentialProxy.d",
+    "object": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/CredentialProxy.o",
+    "swift-dependencies": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/master.swiftdeps"
+  },
+  "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/App.swift": {
+    "object": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/App.swift.o",
+    "swiftmodule": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/App~partial.swiftmodule",
+    "swift-dependencies": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/App.swiftdeps",
+    "diagnostics": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/App.dia"
+  },
+  "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Models/Credential.swift": {
+    "object": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/Credential.swift.o",
+    "swiftmodule": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/Credential~partial.swiftmodule",
+    "swift-dependencies": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/Credential.swiftdeps",
+    "diagnostics": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/Credential.dia"
+  },
+  "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Services/APIClient.swift": {
+    "object": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/APIClient.swift.o",
+    "swiftmodule": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/APIClient~partial.swiftmodule",
+    "swift-dependencies": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/APIClient.swiftdeps",
+    "diagnostics": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/APIClient.dia"
+  },
+  "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Services/ServerManager.swift": {
+    "object": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/ServerManager.swift.o",
+    "swiftmodule": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/ServerManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/ServerManager.swiftdeps",
+    "diagnostics": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/ServerManager.dia"
+  },
+  "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/AddCredentialView.swift": {
+    "object": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/AddCredentialView.swift.o",
+    "swiftmodule": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/AddCredentialView~partial.swiftmodule",
+    "swift-dependencies": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/AddCredentialView.swiftdeps",
+    "diagnostics": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/AddCredentialView.dia"
+  },
+  "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/CredentialListView.swift": {
+    "object": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/CredentialListView.swift.o",
+    "swiftmodule": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/CredentialListView~partial.swiftmodule",
+    "swift-dependencies": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/CredentialListView.swiftdeps",
+    "diagnostics": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/CredentialListView.dia"
+  },
+  "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/MenuBarView.swift": {
+    "object": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/MenuBarView.swift.o",
+    "swiftmodule": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/MenuBarView~partial.swiftmodule",
+    "swift-dependencies": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/MenuBarView.swiftdeps",
+    "diagnostics": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/MenuBarView.dia"
+  },
+  "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/SettingsView.swift": {
+    "object": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/SettingsView.swift.o",
+    "swiftmodule": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/SettingsView~partial.swiftmodule",
+    "swift-dependencies": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/SettingsView.swiftdeps",
+    "diagnostics": "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/SettingsView.dia"
+  }
+}

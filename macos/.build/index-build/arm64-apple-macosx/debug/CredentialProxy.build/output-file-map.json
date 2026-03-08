@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/daniel/github/credential-proxy/macos/.build/index-build/arm64-apple-macosx/debug/CredentialProxy.build/master.swiftdeps"
+  },
+  "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Models/Credential.swift": {
+    "dependencies": "/Users/daniel/github/credential-proxy/macos/.build/index-build/arm64-apple-macosx/debug/CredentialProxy.build/Credential.d",
+    "object": "/Users/daniel/github/credential-proxy/macos/.build/index-build/arm64-apple-macosx/debug/CredentialProxy.build/Credential.swift.o",
+    "swiftmodule": "/Users/daniel/github/credential-proxy/macos/.build/index-build/arm64-apple-macosx/debug/CredentialProxy.build/Credential~partial.swiftmodule",
+    "swift-dependencies": "/Users/daniel/github/credential-proxy/macos/.build/index-build/arm64-apple-macosx/debug/CredentialProxy.build/Credential.swiftdeps",
+    "diagnostics": "/Users/daniel/github/credential-proxy/macos/.build/index-build/arm64-apple-macosx/debug/CredentialProxy.build/Credential.dia"
+  }
+}

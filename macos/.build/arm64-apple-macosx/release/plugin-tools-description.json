@@ -1,0 +1,384 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.CredentialProxy-arm64-apple-macosx26.0-release.module" : {
+      "executable" : "/opt/homebrew/Cellar/swift/6.2.3/Swift-6.2.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/sources",
+      "importPath" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/App.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Models/Credential.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Services/APIClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Services/ServerManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/AddCredentialView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/CredentialListView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/MenuBarView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/SettingsView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/swift-version-F267FA2F636F94C.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "CredentialProxy",
+      "moduleOutputPath" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/Modules/CredentialProxy.swiftmodule",
+      "objects" : [
+        "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/App.swift.o",
+        "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/Credential.swift.o",
+        "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/APIClient.swift.o",
+        "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/ServerManager.swift.o",
+        "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/AddCredentialView.swift.o",
+        "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/CredentialListView.swift.o",
+        "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/MenuBarView.swift.o",
+        "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/SettingsView.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-whole-module-optimization",
+        "-num-threads",
+        "8",
+        "-serialize-diagnostics",
+        "-O",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "CredentialProxy_main",
+        "-swift-version",
+        "5",
+        "-I",
+        "/opt/homebrew/Cellar/swift/6.2.3/Swift-6.2.xctoolchain/usr/lib/swift/macosx/testing",
+        "-L",
+        "/opt/homebrew/Cellar/swift/6.2.3/Swift-6.2.xctoolchain/usr/lib/swift/macosx/testing",
+        "-plugin-path",
+        "/opt/homebrew/Cellar/swift/6.2.3/Swift-6.2.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "macos"
+      ],
+      "outputFileMapPath" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/App.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/Credential.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/APIClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/ServerManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/AddCredentialView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/CredentialListView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/MenuBarView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/SettingsView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/Modules/CredentialProxy.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/App.swift",
+        "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Models/Credential.swift",
+        "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Services/APIClient.swift",
+        "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Services/ServerManager.swift",
+        "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/AddCredentialView.swift",
+        "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/CredentialListView.swift",
+        "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/MenuBarView.swift",
+        "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/SettingsView.swift"
+      ],
+      "tempsPath" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build",
+      "wholeModuleOptimization" : true
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "CredentialProxy" : [
+      "/opt/homebrew/Cellar/swift/6.2.3/Swift-6.2.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "CredentialProxy",
+      "-package-name",
+      "macos",
+      "-c",
+      "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/App.swift",
+      "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Models/Credential.swift",
+      "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Services/APIClient.swift",
+      "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Services/ServerManager.swift",
+      "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/AddCredentialView.swift",
+      "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/CredentialListView.swift",
+      "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/MenuBarView.swift",
+      "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/SettingsView.swift",
+      "-I",
+      "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-whole-module-optimization",
+      "-num-threads",
+      "8",
+      "-serialize-diagnostics",
+      "-O",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "CredentialProxy_main",
+      "-swift-version",
+      "5",
+      "-I",
+      "/opt/homebrew/Cellar/swift/6.2.3/Swift-6.2.xctoolchain/usr/lib/swift/macosx/testing",
+      "-L",
+      "/opt/homebrew/Cellar/swift/6.2.3/Swift-6.2.xctoolchain/usr/lib/swift/macosx/testing",
+      "-plugin-path",
+      "/opt/homebrew/Cellar/swift/6.2.3/Swift-6.2.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "macos",
+      "-driver-use-frontend-path",
+      "/opt/homebrew/Cellar/swift/6.2.3/Swift-6.2.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "CredentialProxy" : [
+
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/App.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Models/Credential.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Services/APIClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Services/ServerManager.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/AddCredentialView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/CredentialListView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/MenuBarView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/SettingsView.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/sources"
+    },
+    "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/APIClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/AddCredentialView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/App.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/Credential.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/CredentialListView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/MenuBarView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/ServerManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.build/SettingsView.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/CredentialProxy.product/Objects.LinkFileList"
+    },
+    "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/swift-version-F267FA2F636F94C.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/opt/homebrew/Cellar/swift/6.2.3/Swift-6.2.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/daniel/github/credential-proxy/macos/.build/arm64-apple-macosx/release/swift-version-F267FA2F636F94C.txt"
+    }
+  }
+}

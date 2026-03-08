@@ -1,0 +1,8 @@
+/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/App.swift
+/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Models/Credential.swift
+/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Services/APIClient.swift
+/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Services/ServerManager.swift
+/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/AddCredentialView.swift
+/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/CredentialListView.swift
+/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/MenuBarView.swift
+/Users/daniel/github/credential-proxy/macos/Sources/CredentialProxy/Views/SettingsView.swift
