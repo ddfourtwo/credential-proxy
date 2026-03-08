@@ -7,6 +7,7 @@ interface ExportedSecret {
   value: string;
   allowedDomains: string[];
   allowedPlacements: string[];
+  allowedCommands?: string[];
 }
 
 interface ExportData {
@@ -42,6 +43,7 @@ export const exportCommand = new Command('export')
             value,
             allowedDomains: secret.allowedDomains,
             allowedPlacements: secret.allowedPlacements,
+            ...(secret.allowedCommands?.length && { allowedCommands: secret.allowedCommands }),
           });
         }
       }

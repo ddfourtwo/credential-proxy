@@ -9,6 +9,7 @@ interface ExportedSecret {
   value: string;
   allowedDomains: string[];
   allowedPlacements: string[];
+  allowedCommands?: string[];
 }
 
 interface ExportData {
@@ -90,10 +91,13 @@ export const importCommand = new Command('import')
           console.log(`📋 Would ${exists ? 'overwrite' : 'import'}: ${secret.name}`);
           console.log(`   Domains: ${secret.allowedDomains.join(', ')}`);
           console.log(`   Placements: ${(secret.allowedPlacements || ['header']).join(', ')}`);
+          if (secret.allowedCommands?.length) {
+            console.log(`   Commands: ${secret.allowedCommands.join(', ')}`);
+          }
         } else {
           const placements = (secret.allowedPlacements || ['header']) as SecretPlacement[];
           try {
-            await addSecret(secret.name, secret.value, secret.allowedDomains, placements);
+            await addSecret(secret.name, secret.value, secret.allowedDomains, placements, secret.allowedCommands);
             
             if (exists) {
               console.log(`🔄 Overwritten: ${secret.name}`);
