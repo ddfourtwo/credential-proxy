@@ -15,7 +15,11 @@ final class ServerManager: ObservableObject {
 
     init(port: UInt16 = 8787) {
         self.port = port
-        self.mgmtToken = ServerManager.loadOrCreateMgmtToken()
+        // Generate ephemeral token in memory — never written to disk.
+        // Management endpoints are only used by the in-process UI.
+        var bytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        self.mgmtToken = bytes.map { String(format: "%02x", $0) }.joined()
     }
 
     static func startShared() {
@@ -98,38 +102,4 @@ final class ServerManager: ObservableObject {
         }
     }
 
-    // MARK: - File-based mgmt token storage
-    // The mgmt token is internal auth between the MCP relay and HTTP server,
-    // not a user credential. File-based avoids Keychain auth dialogs when
-    // the binary signature changes between builds.
-
-    private static func loadOrCreateMgmtToken() -> String {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dataDir = appSupport.appendingPathComponent("credential-proxy")
-        let tokenFile = dataDir.appendingPathComponent(".mgmt-token")
-
-        // Ensure directory exists
-        try? FileManager.default.createDirectory(at: dataDir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-
-        // Try to load existing token
-        if let data = try? Data(contentsOf: tokenFile),
-           let token = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !token.isEmpty {
-            return token
-        }
-
-        // Generate new token
-        var bytes = [UInt8](repeating: 0, count: 32)
-        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-        let token = bytes.map { String(format: "%02x", $0) }.joined()
-
-        // Write with restrictive permissions
-        FileManager.default.createFile(
-            atPath: tokenFile.path,
-            contents: Data(token.utf8),
-            attributes: [.posixPermissions: 0o600]
-        )
-
-        return token
-    }
 }

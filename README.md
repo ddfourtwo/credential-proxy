@@ -277,7 +277,7 @@ Requires the [1Password CLI](https://developer.1password.com/docs/cli/get-starte
 | `~/Applications/Credential Proxy.app` | macOS app (Swift HTTP server + MCP relay) |
 | `~/Library/Application Support/credential-proxy/secrets.json` | Secret metadata (names, domains, placements) |
 | `~/Library/Application Support/credential-proxy/audit.log` | Audit log |
-| `~/Library/Application Support/credential-proxy/.mgmt-token` | Internal management auth token |
+| (in-memory only) | Management auth token (ephemeral, never written to disk) |
 | macOS Keychain (`com.credential-proxy.secrets`) | Secret values |
 | `~/.claude.json` | MCP server registration |
 | `~/Library/LaunchAgents/com.credential-proxy.app.plist` | Auto-start at login |
