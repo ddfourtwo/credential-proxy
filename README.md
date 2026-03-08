@@ -2,7 +2,7 @@
 
 An MCP (Model Context Protocol) server that lets AI agents make authenticated API requests and run credentialed commands — without ever seeing the credential values.
 
-Agents reference secrets by name using `{{PLACEHOLDER}}` syntax. The MCP server substitutes real values server-side, enforces domain allowlists, validates placement rules, and redacts any leaked values from responses. The agent never has access to the actual secret.
+The credential handling runs in a **compiled Swift binary** embedded in a macOS app. The agent communicates through a thin Node.js MCP relay that forwards tool calls to the native HTTP server. Since the agent can modify JavaScript but not compiled Swift, the security boundary is enforced at the binary level.
 
 ## How It Works
 
@@ -10,40 +10,48 @@ Agents reference secrets by name using `{{PLACEHOLDER}}` syntax. The MCP server 
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    SECRET NEVER CROSSES THIS LINE                   │
 ├─────────────────────────────────────────────────────────────────────┤
-│  Agent Context              │      MCP Server (Trusted)             │
+│  Agent Context              │      Native Swift Server (Compiled)   │
 │  (Untrusted)                │                                       │
-│  • Sees secret NAMES only   │  • Stores encrypted VALUES           │
+│  • Sees secret NAMES only   │  • Stores values in macOS Keychain   │
 │  • Uses {{PLACEHOLDER}}     │  • Validates domain allowlist        │
 │  • Receives sanitized resp  │  • Executes actual requests          │
 │  • Cannot exfiltrate        │  • Redacts leaked values from output │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+```
+Claude Code → MCP stdio relay (Node.js, thin) → HTTP :8787 (Swift, compiled) → Keychain
+```
+
 The agent asks: *"POST to `https://api.linear.app/graphql` with header `Authorization: Bearer {{LINEAR_API_KEY}}`"*
 
-The MCP server:
+The server:
 1. Validates `LINEAR_API_KEY` is allowed for `*.linear.app`
 2. Validates the placement (`header`) is permitted
-3. Substitutes the real value and executes the request
-4. Scans the response for leaked secret values and redacts them
-5. Returns the sanitized response to the agent
+3. Retrieves the value from macOS Keychain and substitutes it
+4. Executes the request
+5. Scans the response for leaked secret values and redacts them
+6. Returns the sanitized response to the agent
 
 ## Installation
 
-**Requirements:** Node.js >= 20.0.0
+**Requirements:** macOS 13+, Node.js 20+, Swift (Xcode Command Line Tools)
 
 ```bash
-# Clone and build
-git clone https://github.com/yourusername/credential-proxy.git
+git clone https://github.com/ddfourtwo/credential-proxy.git
 cd credential-proxy
-npm install
-npm run build
-
-# Install to Claude Code as an MCP server
-npx credential-proxy install
+bash install.sh
 ```
 
-The `install` command registers the MCP server in `~/.claude.json` and copies the built files to `~/.claude/mcp-servers/credential-proxy/`.
+The installer:
+1. Builds the MCP relay (Node.js stdio → HTTP bridge)
+2. Builds the native macOS app (Swift HTTP server)
+3. Creates `~/Applications/Credential Proxy.app`
+4. Registers the MCP server in `~/.claude.json`
+5. Sets up a LaunchAgent (auto-starts at login)
+6. Launches the app
+
+Restart Claude Code after install to load the MCP server.
 
 ## Quick Start
 
@@ -77,7 +85,6 @@ npx credential-proxy add GIT_TOKEN -d "*.github.com" -p "arg,env" -c "git *"
 
 # Using 1Password instead of local storage
 npx credential-proxy add GITHUB_TOKEN --1password "op://Private/GitHub/token" -d "*.github.com"
-npx credential-proxy add DEPLOY_KEY --op "op://Work/Deploy Key/password" -d "*.example.com" -p "env,arg"
 ```
 
 **Options:**
@@ -122,38 +129,16 @@ npx credential-proxy test LINEAR_API_KEY
 ```bash
 # Export (includes decrypted values!)
 npx credential-proxy export ~/secrets-backup.json
-npx credential-proxy export --stdout
 
 # Import
 npx credential-proxy import ~/secrets-backup.json
-npx credential-proxy import ~/secrets-backup.json --dry-run     # preview
 npx credential-proxy import ~/secrets-backup.json --overwrite   # replace existing
 
 # Transfer between machines via SSH
-credential-proxy export --stdout | ssh dest 'source ~/.zshrc && credential-proxy import --stdin'
-ssh source 'source ~/.zshrc && credential-proxy export --stdout' | credential-proxy import --stdin
+credential-proxy export --stdout | ssh dest 'credential-proxy import --stdin'
 ```
 
 > **Warning:** Export files contain decrypted secrets. Delete them immediately after use.
-
-### `serve` — HTTP server mode
-
-Run as an HTTP server for non-MCP clients:
-
-```bash
-credential-proxy serve                    # default: localhost:8787
-credential-proxy serve --port 9000        # custom port
-credential-proxy serve --host 0.0.0.0     # all interfaces (use with caution)
-```
-
-**Endpoints:**
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Health check |
-| GET | `/credentials` | List configured credentials |
-| POST | `/proxy` | HTTP request with credential substitution |
-| POST | `/exec` | Command execution with credential substitution |
 
 ## MCP Tool Reference
 
@@ -164,28 +149,16 @@ The MCP server exposes three tools to the agent:
 Discover available credentials. Returns names and metadata only — never values.
 
 ```json
-// Request
-list_credentials()
-
 // Response
 {
   "secrets": [
     {
       "name": "LINEAR_API_KEY",
-      "sourceType": "encrypted",
+      "sourceType": "keychain",
       "allowedDomains": ["*.linear.app"],
       "allowedPlacements": ["header"],
       "configured": true,
       "usageCount": 42
-    },
-    {
-      "name": "GITHUB_TOKEN",
-      "sourceType": "1password",
-      "allowedDomains": ["*.github.com"],
-      "allowedPlacements": ["header", "env", "arg"],
-      "allowedCommands": ["git *"],
-      "configured": true,
-      "usageCount": 7
     }
   ]
 }
@@ -193,9 +166,7 @@ list_credentials()
 
 ### `proxy_request`
 
-Make HTTP requests with credential substitution. Use `{{SECRET_NAME}}` placeholders in the URL, headers, or body. The server substitutes real values, executes the request, and returns a sanitized response.
-
-**Parameters:**
+Make HTTP requests with credential substitution. Use `{{SECRET_NAME}}` placeholders in the URL, headers, or body.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -208,7 +179,6 @@ Make HTTP requests with credential substitution. Use `{{SECRET_NAME}}` placehold
 **Example — Linear GraphQL API:**
 
 ```json
-// Request
 proxy_request({
   "method": "POST",
   "url": "https://api.linear.app/graphql",
@@ -220,15 +190,6 @@ proxy_request({
     "query": "{ issues(first: 10) { nodes { id title state { name } } } }"
   }
 })
-
-// Response
-{
-  "status": 200,
-  "statusText": "OK",
-  "headers": { "content-type": "application/json" },
-  "body": "{\"data\":{\"issues\":{\"nodes\":[...]}}}",
-  "redacted": false
-}
 ```
 
 **Example — GitHub REST API:**
@@ -238,18 +199,8 @@ proxy_request({
   "method": "GET",
   "url": "https://api.github.com/user/repos?per_page=5",
   "headers": {
-    "Authorization": "Bearer {{GITHUB_TOKEN}}",
-    "Accept": "application/vnd.github+json"
+    "Authorization": "Bearer {{GITHUB_TOKEN}}"
   }
-})
-```
-
-**Example — Secret in query parameter:**
-
-```json
-proxy_request({
-  "method": "GET",
-  "url": "https://api.example.com/data?key={{API_KEY}}"
 })
 ```
 
@@ -257,32 +208,18 @@ proxy_request({
 
 ```json
 // Domain not allowed
-{
-  "error": "SECRET_DOMAIN_BLOCKED",
-  "message": "Secret 'LINEAR_API_KEY' cannot be used with domain 'evil.com'",
-  "allowedDomains": ["*.linear.app"]
-}
+{ "error": "SECRET_DOMAIN_BLOCKED", "message": "Secret 'KEY' cannot be used with domain 'evil.com'" }
 
 // Placement not allowed
-{
-  "error": "SECRET_PLACEMENT_BLOCKED",
-  "message": "Secret 'API_KEY' cannot be used in 'body'",
-  "allowedPlacements": ["header"]
-}
+{ "error": "SECRET_PLACEMENT_BLOCKED", "message": "Secret 'KEY' cannot be used in 'body'" }
 
 // Secret not configured
-{
-  "error": "SECRET_NOT_FOUND",
-  "message": "Secret 'MISSING_KEY' is not configured",
-  "hint": "Use 'credential-proxy add MISSING_KEY' to configure"
-}
+{ "error": "SECRET_NOT_FOUND", "message": "Secret 'MISSING' is not configured" }
 ```
 
 ### `proxy_exec`
 
-Execute shell commands with credential substitution. Secrets can be injected into command arguments or environment variables. All secret values are redacted from stdout/stderr before returning to the agent.
-
-**Parameters:**
+Execute shell commands with credential substitution. Secrets can be injected into command arguments or environment variables.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -292,25 +229,15 @@ Execute shell commands with credential substitution. Secrets can be injected int
 | `timeout` | number | no | Timeout in ms (default: 30000) |
 | `stdin` | string | no | Input to send to stdin |
 
-**Example — Git clone with token in URL:**
+**Example — Git clone with token:**
 
 ```json
 proxy_exec({
-  "command": ["git", "clone", "https://{{GITHUB_TOKEN}}@github.com/org/private-repo.git"],
-  "cwd": "/tmp"
+  "command": ["git", "clone", "https://{{GITHUB_TOKEN}}@github.com/org/private-repo.git"]
 })
-
-// Response
-{
-  "exitCode": 0,
-  "stdout": "Cloning into 'private-repo'...\n",
-  "stderr": "",
-  "redacted": false,
-  "timedOut": false
-}
 ```
 
-**Example — GitHub CLI with token as env var:**
+**Example — GitHub CLI with env var:**
 
 ```json
 proxy_exec({
@@ -319,116 +246,55 @@ proxy_exec({
 })
 ```
 
-**Example — npm publish with auth token:**
+## Architecture
 
-```json
-proxy_exec({
-  "command": ["npm", "publish", "--registry", "https://registry.example.com"],
-  "env": { "NPM_TOKEN": "{{NPM_AUTH_TOKEN}}" },
-  "cwd": "/path/to/package"
-})
-```
+### Security Model
 
-**Security constraints for `proxy_exec`:**
-- Secrets must have `arg` or `env` in their `allowedPlacements`
-- If `allowedCommands` is set, the full command string must match at least one pattern (glob-style via [minimatch](https://github.com/isaacs/minimatch))
-- All secret values are redacted from stdout and stderr before returning
+- **Secret storage** — values in macOS Keychain (via Security.framework), metadata in JSON
+- **Compiled server** — HTTP server is a Swift binary; agents cannot modify it
+- **Domain allowlists** — each secret specifies which domains it can be sent to. Wildcards supported (`*.github.com`)
+- **Placement validation** — control whether a secret can appear in headers, body, query params, env vars, or command args
+- **Response redaction** — all output scanned for secret values (>= 6 chars) and replaced with `[REDACTED:SECRET_NAME]`
+- **Audit logging** — all usage logged to `~/Library/Application Support/credential-proxy/audit.log` with rotation at 10MB
+- **Localhost only** — HTTP server binds to `127.0.0.1:8787`, not accessible from the network
 
-## Security Model
+### 1Password Integration
 
-### Encryption at Rest
-
-- Secrets are encrypted with **AES-256-GCM** (authenticated encryption)
-- Each secret gets a unique IV and auth tag
-- The master encryption key is stored in the **macOS Keychain** (via [keytar](https://github.com/nicedoc/keytar))
-- Fallback to file-based key storage (`~/.local/share/credential-proxy/secrets.key`) on systems without a keyring
-- Secret files are written with `chmod 600` (owner read/write only)
-
-### Domain Allowlists
-
-Every credential has a list of allowed domains. The server validates the target domain before substituting any secret:
+Reference secrets stored in 1Password instead of macOS Keychain. Values are fetched on-demand via the `op` CLI.
 
 ```bash
-# This secret can only be sent to Linear's API
-npx credential-proxy add LINEAR_API_KEY -d "*.linear.app"
-
-# Wildcards match subdomains: *.github.com matches api.github.com, raw.github.com, etc.
-npx credential-proxy add GITHUB_TOKEN -d "*.github.com"
-```
-
-If an agent attempts to use a credential with an unauthorized domain, the request is blocked and the attempt is audit-logged.
-
-### Placement Validation
-
-Control exactly where a secret can appear in requests:
-
-- `header` — HTTP headers (default)
-- `body` — HTTP request body
-- `query` — URL query parameters
-- `env` — Environment variables (for `proxy_exec`)
-- `arg` — Command-line arguments (for `proxy_exec`)
-
-A secret configured with `-p header` cannot be placed in the request body, even if the domain matches.
-
-### Response Redaction
-
-After every request or command execution, the server scans all output (response body, stdout, stderr) for the actual secret values. Any matches are replaced with `[REDACTED:SECRET_NAME]` before the response reaches the agent.
-
-### Audit Logging
-
-All secret usage is logged to `~/.local/share/credential-proxy/logs/secrets-audit.log`:
-
-```
-[2025-12-31T10:00:00Z] SECRET_USED secret=LINEAR_API_KEY domain=api.linear.app method=POST status=200 duration=234ms
-[2025-12-31T10:00:05Z] SECRET_BLOCKED secret=LINEAR_API_KEY domain=evil.com reason=DOMAIN_NOT_ALLOWED
-```
-
-Logged events include: secret added, secret used (with domain/command, status, duration), secret blocked (with reason), and secret values redacted from output.
-
-### No Plaintext Exposure
-
-The agent never sees credential values at any point:
-1. **Storage** — encrypted with AES-256-GCM, key in system keychain
-2. **Substitution** — happens server-side in the MCP process
-3. **Response** — scanned and redacted before returning to agent
-4. **Audit** — logs record usage metadata, never values
-
-## 1Password Integration
-
-Instead of storing encrypted secrets locally, reference secrets stored in 1Password. Values are fetched on-demand via the `op` CLI with a 1-minute cache.
-
-```bash
-# Add a 1Password-backed credential
 npx credential-proxy add GITHUB_TOKEN \
   --1password "op://Private/GitHub Token/password" \
-  -d "*.github.com" -p "header,env,arg"
+  -d "*.github.com"
 ```
 
-**Requirements:** Install and authenticate the [1Password CLI](https://developer.1password.com/docs/cli/get-started/) (`op signin`).
+Requires the [1Password CLI](https://developer.1password.com/docs/cli/get-started/).
 
-**Benefits:**
-- No local secret storage — values fetched from 1Password on each use
-- Automatic rotation — update in 1Password, credential-proxy picks it up
-- Short-lived cache (1 minute) balances security and performance
-
-## Configuration & Data Locations
+## Data Locations
 
 | Path | Purpose |
 |------|---------|
-| `~/.claude/mcp-servers/credential-proxy/` | MCP server installation |
-| `~/.local/share/credential-proxy/secrets.json` | Encrypted secrets store |
-| `~/.local/share/credential-proxy/secrets.key` | Encryption key (keyring fallback) |
-| `~/.local/share/credential-proxy/logs/secrets-audit.log` | Audit log |
+| `~/Applications/Credential Proxy.app` | macOS app (Swift HTTP server + MCP relay) |
+| `~/Library/Application Support/credential-proxy/secrets.json` | Secret metadata (names, domains, placements) |
+| `~/Library/Application Support/credential-proxy/audit.log` | Audit log |
+| `~/Library/Application Support/credential-proxy/.mgmt-token` | Internal management auth token |
+| macOS Keychain (`com.credential-proxy.secrets`) | Secret values |
+| `~/.claude.json` | MCP server registration |
+| `~/Library/LaunchAgents/com.credential-proxy.app.plist` | Auto-start at login |
 
 ## Development
 
 ```bash
 npm install
-npm run build       # build with tsup
+npm run build       # build MCP relay with tsup
 npm run dev         # watch mode
 npm run test        # run tests (vitest)
-npm run typecheck   # type-check without emitting
-npm run lint        # eslint
+
+# Build the Swift server
+cd macos && swift build -c release
+
+# Full install (builds everything + creates app bundle)
+bash install.sh
 ```
 
 ## License
