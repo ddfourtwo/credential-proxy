@@ -6,16 +6,16 @@ import { homedir } from 'node:os';
 // We'll use dynamic imports to get fresh module state.
 
 describe('keyring instance-aware paths', () => {
-  const originalEnv = { ...process.env };
-
   afterEach(() => {
     // Restore env vars
+    delete process.env.CREDENTIAL_PROXY_INSTANCE;
     delete process.env.CLAUDETMUX_INSTANCE;
     delete process.env.CREDENTIAL_PROXY_DATA_DIR;
   });
 
   describe('getDataDir', () => {
-    it('returns default path when CLAUDETMUX_INSTANCE is unset', async () => {
+    it('returns default path when no instance env is set', async () => {
+      delete process.env.CREDENTIAL_PROXY_INSTANCE;
       delete process.env.CLAUDETMUX_INSTANCE;
       delete process.env.CREDENTIAL_PROXY_DATA_DIR;
 
@@ -24,8 +24,9 @@ describe('keyring instance-aware paths', () => {
       expect(result).toBe(join(homedir(), '.local', 'share', 'credential-proxy'));
     });
 
-    it('returns instance-specific path when CLAUDETMUX_INSTANCE is set', async () => {
-      process.env.CLAUDETMUX_INSTANCE = 'work';
+    it('returns instance-specific path when CREDENTIAL_PROXY_INSTANCE is set', async () => {
+      process.env.CREDENTIAL_PROXY_INSTANCE = 'work';
+      delete process.env.CLAUDETMUX_INSTANCE;
       delete process.env.CREDENTIAL_PROXY_DATA_DIR;
 
       const { getDataDir } = await import('../src/storage/keyring.js');
@@ -33,8 +34,28 @@ describe('keyring instance-aware paths', () => {
       expect(result).toBe(join(homedir(), '.local', 'share', 'credential-proxy-work'));
     });
 
+    it('falls back to CLAUDETMUX_INSTANCE for backward compatibility', async () => {
+      delete process.env.CREDENTIAL_PROXY_INSTANCE;
+      process.env.CLAUDETMUX_INSTANCE = 'legacy';
+      delete process.env.CREDENTIAL_PROXY_DATA_DIR;
+
+      const { getDataDir } = await import('../src/storage/keyring.js');
+      const result = getDataDir();
+      expect(result).toBe(join(homedir(), '.local', 'share', 'credential-proxy-legacy'));
+    });
+
+    it('CREDENTIAL_PROXY_INSTANCE takes priority over CLAUDETMUX_INSTANCE', async () => {
+      process.env.CREDENTIAL_PROXY_INSTANCE = 'new';
+      process.env.CLAUDETMUX_INSTANCE = 'old';
+      delete process.env.CREDENTIAL_PROXY_DATA_DIR;
+
+      const { getDataDir } = await import('../src/storage/keyring.js');
+      const result = getDataDir();
+      expect(result).toBe(join(homedir(), '.local', 'share', 'credential-proxy-new'));
+    });
+
     it('CREDENTIAL_PROXY_DATA_DIR overrides both default and instance paths', async () => {
-      process.env.CLAUDETMUX_INSTANCE = 'work';
+      process.env.CREDENTIAL_PROXY_INSTANCE = 'work';
       process.env.CREDENTIAL_PROXY_DATA_DIR = '/custom/data/dir';
 
       const { getDataDir } = await import('../src/storage/keyring.js');
@@ -43,6 +64,7 @@ describe('keyring instance-aware paths', () => {
     });
 
     it('CREDENTIAL_PROXY_DATA_DIR overrides default when no instance set', async () => {
+      delete process.env.CREDENTIAL_PROXY_INSTANCE;
       delete process.env.CLAUDETMUX_INSTANCE;
       process.env.CREDENTIAL_PROXY_DATA_DIR = '/override/path';
 
@@ -54,7 +76,7 @@ describe('keyring instance-aware paths', () => {
 
   describe('getSecretsFilePath', () => {
     it('uses instance-aware data dir', async () => {
-      process.env.CLAUDETMUX_INSTANCE = 'personal';
+      process.env.CREDENTIAL_PROXY_INSTANCE = 'personal';
       delete process.env.CREDENTIAL_PROXY_DATA_DIR;
 
       const { getSecretsFilePath } = await import('../src/storage/keyring.js');
@@ -65,7 +87,7 @@ describe('keyring instance-aware paths', () => {
 
   describe('getAuditLogPath', () => {
     it('uses instance-aware data dir', async () => {
-      process.env.CLAUDETMUX_INSTANCE = 'personal';
+      process.env.CREDENTIAL_PROXY_INSTANCE = 'personal';
       delete process.env.CREDENTIAL_PROXY_DATA_DIR;
 
       const { getAuditLogPath } = await import('../src/storage/keyring.js');

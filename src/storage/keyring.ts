@@ -12,8 +12,8 @@ function getDataDir(): string {
   const explicit = process.env.CREDENTIAL_PROXY_DATA_DIR;
   if (explicit) return explicit;
 
-  // Instance-derived path
-  const instance = process.env.CLAUDETMUX_INSTANCE;
+  // Instance-derived path (CREDENTIAL_PROXY_INSTANCE preferred, CLAUDETMUX_INSTANCE as fallback)
+  const instance = process.env.CREDENTIAL_PROXY_INSTANCE ?? process.env.CLAUDETMUX_INSTANCE;
   if (instance) {
     return join(homedir(), '.local', 'share', `credential-proxy-${instance}`);
   }
