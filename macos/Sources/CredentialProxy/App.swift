@@ -1,8 +1,7 @@
 import SwiftUI
 
-@main
 struct CredentialProxyApp: App {
-    @StateObject private var serverManager = ServerManager()
+    @ObservedObject private var serverManager = ServerManager.shared
     @StateObject private var apiClient = APIClient()
 
     var body: some Scene {
@@ -27,6 +26,4 @@ struct CredentialProxyApp: App {
                 .environmentObject(serverManager)
         }
     }
-
-    init() {}
 }

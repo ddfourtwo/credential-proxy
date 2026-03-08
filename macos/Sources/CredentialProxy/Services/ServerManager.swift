@@ -2,22 +2,29 @@ import Foundation
 import AppKit
 import Security
 
-@MainActor
 final class ServerManager: ObservableObject {
+    static let shared = ServerManager()
+
     @Published var isRunning = false
     @Published var statusMessage = "Starting..."
 
     private var httpServer: HTTPServer?
-    private let port: UInt16
+    let port: UInt16
     private let mgmtToken: String
     private var healthCheckTimer: Timer?
 
     init(port: UInt16 = 8787) {
         self.port = port
-        self.mgmtToken = ServerManager.loadOrCreateKeychainToken()
+        self.mgmtToken = ServerManager.loadOrCreateMgmtToken()
+    }
+
+    static func startShared() {
+        guard shared.httpServer == nil else { return }
+        shared.start()
     }
 
     func start() {
+        NSLog("[ServerManager] start() called, port=\(port)")
         let server = HTTPServer(port: port)
 
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -38,10 +45,16 @@ final class ServerManager: ObservableObject {
         do {
             try server.start(router: router)
             httpServer = server
-            statusMessage = "Starting server..."
+            DispatchQueue.main.async { [weak self] in
+                self?.statusMessage = "Starting server..."
+            }
+            NSLog("[ServerManager] server.start() succeeded")
             startHealthChecks()
         } catch {
-            statusMessage = "Failed to start: \(error.localizedDescription)"
+            DispatchQueue.main.async { [weak self] in
+                self?.statusMessage = "Failed to start: \(error.localizedDescription)"
+            }
+            NSLog("[ServerManager] server.start() failed: \(error)")
         }
     }
 
@@ -50,13 +63,15 @@ final class ServerManager: ObservableObject {
         healthCheckTimer = nil
         httpServer?.stop()
         httpServer = nil
-        isRunning = false
-        statusMessage = "Stopped"
+        DispatchQueue.main.async { [weak self] in
+            self?.isRunning = false
+            self?.statusMessage = "Stopped"
+        }
     }
 
     func restart() {
         stop()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.start()
         }
     }
@@ -66,37 +81,40 @@ final class ServerManager: ObservableObject {
     }
 
     private func startHealthChecks() {
-        healthCheckTimer?.invalidate()
-        healthCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                let client = APIClient(port: Int(self.port))
-                let healthy = await client.healthCheck()
-                self.isRunning = healthy
-                self.statusMessage = healthy ? "Running on port \(self.port)" : "Starting..."
+        let port = self.port
+        DispatchQueue.main.async { [weak self] in
+            self?.healthCheckTimer?.invalidate()
+            self?.healthCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+                Task {
+                    guard let self else { return }
+                    let client = APIClient(port: Int(port))
+                    let healthy = await client.healthCheck()
+                    await MainActor.run {
+                        self.isRunning = healthy
+                        self.statusMessage = healthy ? "Running on port \(port)" : "Starting..."
+                    }
+                }
             }
         }
     }
 
-    // MARK: - Keychain-based token storage
+    // MARK: - File-based mgmt token storage
+    // The mgmt token is internal auth between the MCP relay and HTTP server,
+    // not a user credential. File-based avoids Keychain auth dialogs when
+    // the binary signature changes between builds.
 
-    private static let tokenService = "com.credential-proxy.mgmt-token"
-    private static let tokenAccount = "management"
+    private static func loadOrCreateMgmtToken() -> String {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dataDir = appSupport.appendingPathComponent("credential-proxy")
+        let tokenFile = dataDir.appendingPathComponent(".mgmt-token")
 
-    private static func loadOrCreateKeychainToken() -> String {
-        // Try to load from Keychain
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: tokenService,
-            kSecAttrAccount as String: tokenAccount,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
+        // Ensure directory exists
+        try? FileManager.default.createDirectory(at: dataDir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
 
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-
-        if status == errSecSuccess, let data = result as? Data, let token = String(data: data, encoding: .utf8), !token.isEmpty {
+        // Try to load existing token
+        if let data = try? Data(contentsOf: tokenFile),
+           let token = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !token.isEmpty {
             return token
         }
 
@@ -105,22 +123,12 @@ final class ServerManager: ObservableObject {
         _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
         let token = bytes.map { String(format: "%02x", $0) }.joined()
 
-        // Store in Keychain
-        let addQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: tokenService,
-            kSecAttrAccount as String: tokenAccount,
-            kSecValueData as String: token.data(using: .utf8)!,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-            kSecAttrLabel as String: "Credential Proxy: Management Token"
-        ]
-        SecItemAdd(addQuery as CFDictionary, nil)
-
-        // Remove old file-based token if it exists
-        let oldTokenFile = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("CredentialProxy")
-            .appendingPathComponent(".mgmt-token")
-        try? FileManager.default.removeItem(at: oldTokenFile)
+        // Write with restrictive permissions
+        FileManager.default.createFile(
+            atPath: tokenFile.path,
+            contents: Data(token.utf8),
+            attributes: [.posixPermissions: 0o600]
+        )
 
         return token
     }
