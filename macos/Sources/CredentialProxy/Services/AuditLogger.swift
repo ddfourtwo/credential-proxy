@@ -40,21 +40,21 @@ struct AuditEvent: Codable {
 class AuditLogger {
     private static let maxLogSize = 10 * 1024 * 1024 // 10MB
 
-    private let logPath: String
+    private(set) var logFilePath: String
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         return encoder
     }()
 
-    init(logPath: String? = nil) {
-        if let logPath {
-            self.logPath = logPath
+    init(logFilePath: String? = nil) {
+        if let logFilePath {
+            self.logFilePath = logFilePath
         } else {
             let appSupport = FileManager.default.urls(
                 for: .applicationSupportDirectory, in: .userDomainMask
             ).first!.path
-            self.logPath = "\(appSupport)/CredentialProxy/logs/secrets-audit.log"
+            self.logFilePath = "\(appSupport)/CredentialProxy/logs/secrets-audit.log"
         }
     }
 
@@ -70,14 +70,14 @@ class AuditLogger {
         let line = json + "\n"
         let fileManager = FileManager.default
 
-        if fileManager.fileExists(atPath: logPath) {
-            guard let handle = FileHandle(forWritingAtPath: logPath) else { return }
+        if fileManager.fileExists(atPath: logFilePath) {
+            guard let handle = FileHandle(forWritingAtPath: logFilePath) else { return }
             defer { handle.closeFile() }
             handle.seekToEndOfFile()
             handle.write(Data(line.utf8))
         } else {
             fileManager.createFile(
-                atPath: logPath,
+                atPath: logFilePath,
                 contents: Data(line.utf8),
                 attributes: [.posixPermissions: 0o600]
             )
@@ -85,7 +85,7 @@ class AuditLogger {
     }
 
     private func ensureLogDir() {
-        let dir = (logPath as NSString).deletingLastPathComponent
+        let dir = (logFilePath as NSString).deletingLastPathComponent
         var isDir: ObjCBool = false
         if !FileManager.default.fileExists(atPath: dir, isDirectory: &isDir) {
             try? FileManager.default.createDirectory(
@@ -98,15 +98,15 @@ class AuditLogger {
 
     private func rotateIfNeeded() {
         let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: logPath),
-              let attrs = try? fileManager.attributesOfItem(atPath: logPath),
+        guard fileManager.fileExists(atPath: logFilePath),
+              let attrs = try? fileManager.attributesOfItem(atPath: logFilePath),
               let size = attrs[.size] as? Int,
               size >= Self.maxLogSize else {
             return
         }
 
         let timestamp = Int(Date().timeIntervalSince1970 * 1000)
-        let rotatedPath = "\(logPath).\(timestamp).old"
-        try? fileManager.moveItem(atPath: logPath, toPath: rotatedPath)
+        let rotatedPath = "\(logFilePath).\(timestamp).old"
+        try? fileManager.moveItem(atPath: logFilePath, toPath: rotatedPath)
     }
 }
