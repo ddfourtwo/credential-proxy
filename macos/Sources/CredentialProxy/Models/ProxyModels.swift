@@ -103,7 +103,7 @@ enum ProxyRequestErrorType: String, Codable {
     case requestFailed = "REQUEST_FAILED"
 }
 
-struct ProxyRequestError: Codable {
+struct ProxyRequestError: Codable, Error {
     let error: ProxyRequestErrorType
     let message: String
     var hint: String?
@@ -140,7 +140,7 @@ enum ProxyExecErrorType: String, Codable {
     case execFailed = "EXEC_FAILED"
 }
 
-struct ProxyExecError: Codable {
+struct ProxyExecError: Codable, Error {
     let error: ProxyExecErrorType
     let message: String
     var hint: String?
