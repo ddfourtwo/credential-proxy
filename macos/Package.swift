@@ -8,10 +8,6 @@ let package = Package(
         .executableTarget(
             name: "CredentialProxy",
             path: "Sources/CredentialProxy"
-        ),
-        .executableTarget(
-            name: "credential-proxy-resolve",
-            path: "Sources/CredentialProxyResolver"
         )
     ]
 )

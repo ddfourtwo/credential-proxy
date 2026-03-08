@@ -7,79 +7,37 @@ final class ServerManager: ObservableObject {
     @Published var isRunning = false
     @Published var statusMessage = "Starting..."
 
-    private var process: Process?
-    private let port: Int
+    private var httpServer: HTTPServer?
+    private let port: UInt16
     private let mgmtToken: String
     private var healthCheckTimer: Timer?
 
-    var serverPath: String {
-        // When running from .app bundle: Contents/Resources/mcp-server/index.js
-        if let resourcePath = Bundle.main.resourcePath {
-            let bundled = "\(resourcePath)/mcp-server/index.js"
-            if FileManager.default.fileExists(atPath: bundled) {
-                return bundled
-            }
-        }
-        // Fallback: installed location
-        let installed = "\(NSHomeDirectory())/.claude/mcp-servers/credential-proxy/index.js"
-        if FileManager.default.fileExists(atPath: installed) {
-            return installed
-        }
-        return ""
-    }
-
-    private var resolverPath: String? {
-        if let resourcePath = Bundle.main.resourcePath {
-            let path = "\(resourcePath)/credential-proxy-resolve"
-            if FileManager.default.fileExists(atPath: path) {
-                return path
-            }
-        }
-        return nil
-    }
-
-    init(port: Int = 8787) {
+    init(port: UInt16 = 8787) {
         self.port = port
         self.mgmtToken = ServerManager.loadOrCreateKeychainToken()
     }
 
     func start() {
-        guard !serverPath.isEmpty else {
-            statusMessage = "Server files not found"
-            return
-        }
+        let server = HTTPServer(port: port)
 
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        proc.arguments = ["node", serverPath, "serve", "--port", "\(port)"]
-        proc.environment = ProcessInfo.processInfo.environment
-        proc.environment?["CREDENTIAL_PROXY_MGMT_TOKEN"] = mgmtToken
-        proc.environment?["CREDENTIAL_PROXY_KEYCHAIN"] = "1"
-
-        // Point resolver to the bundled binary
-        if let resolver = resolverPath {
-            proc.environment?["CREDENTIAL_PROXY_RESOLVER_PATH"] = resolver
-        }
-
-        // Use app support dir for metadata
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dataDir = appSupport.appendingPathComponent("CredentialProxy").path
         try? FileManager.default.createDirectory(atPath: dataDir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        proc.environment?["CREDENTIAL_PROXY_DATA_DIR"] = dataDir
 
-        proc.standardOutput = FileHandle.nullDevice
-        proc.standardError = FileHandle.nullDevice
+        let auditLogger = AuditLogger(logFilePath: "\(dataDir)/audit.log")
+        let secretStore = SecretStore.shared
+        let router = Router()
 
-        proc.terminationHandler = { [weak self] _ in
-            Task { @MainActor in
-                self?.isRunning = false
-                self?.statusMessage = "Server stopped"
-            }
-        }
+        RequestHandler.configureRoutes(
+            router: router,
+            secretStore: secretStore,
+            auditLogger: auditLogger,
+            mgmtToken: mgmtToken
+        )
 
         do {
-            try proc.run()
-            process = proc
+            try server.start(router: router)
+            httpServer = server
             statusMessage = "Starting server..."
             startHealthChecks()
         } catch {
@@ -90,8 +48,8 @@ final class ServerManager: ObservableObject {
     func stop() {
         healthCheckTimer?.invalidate()
         healthCheckTimer = nil
-        process?.terminate()
-        process = nil
+        httpServer?.stop()
+        httpServer = nil
         isRunning = false
         statusMessage = "Stopped"
     }
@@ -112,7 +70,7 @@ final class ServerManager: ObservableObject {
         healthCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
-                let client = APIClient(port: self.port)
+                let client = APIClient(port: Int(self.port))
                 let healthy = await client.healthCheck()
                 self.isRunning = healthy
                 self.statusMessage = healthy ? "Running on port \(self.port)" : "Starting..."

@@ -31,11 +31,7 @@ struct SettingsView: View {
 
             Section("About") {
                 LabeledContent("Version", value: "1.0.0")
-                LabeledContent("MCP Server") {
-                    Text(serverManager.serverPath)
-                        .font(.caption)
-                        .textSelection(.enabled)
-                }
+                LabeledContent("Server", value: "Native (port 8787)")
             }
         }
         .formStyle(.grouped)
