@@ -1,2 +1,0 @@
-Swift version 6.2.3 (swift-6.2.3-RELEASE)
-Target: arm64-apple-macosx26.0
