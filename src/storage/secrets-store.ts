@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { encrypt, decrypt } from './encryption.js';
 import { getMasterKey, getSecretsFilePath, ensureDataDir } from './keyring.js';
+import { isKeychainMode, resolveFromKeychain, storeInKeychain, deleteFromKeychain } from './keychain-resolver.js';
 import { 
   SecretsStore, 
   SecretMetadata, 
@@ -82,20 +83,33 @@ export async function addSecret(
   validateSecretName(name);
   validateDomains(allowedDomains);
 
-  const masterKey = await getMasterKey();
   const store = await loadStore();
-
   const overwritten = name in store.secrets;
 
-  store.secrets[name] = {
-    source: { type: 'encrypted', encryptedValue: encrypt(value, masterKey) },
-    allowedDomains,
-    allowedPlacements,
-    allowedCommands,
-    createdAt: new Date().toISOString(),
-    lastUsed: null,
-    usageCount: 0
-  };
+  if (isKeychainMode()) {
+    // Store value in macOS Keychain, metadata in file
+    await storeInKeychain(name, value);
+    store.secrets[name] = {
+      source: { type: 'encrypted', encryptedValue: '__keychain__' },
+      allowedDomains,
+      allowedPlacements,
+      allowedCommands,
+      createdAt: new Date().toISOString(),
+      lastUsed: null,
+      usageCount: 0
+    };
+  } else {
+    const masterKey = await getMasterKey();
+    store.secrets[name] = {
+      source: { type: 'encrypted', encryptedValue: encrypt(value, masterKey) },
+      allowedDomains,
+      allowedPlacements,
+      allowedCommands,
+      createdAt: new Date().toISOString(),
+      lastUsed: null,
+      usageCount: 0
+    };
+  }
 
   await saveStore(store);
   return { created: true, overwritten };
@@ -167,9 +181,14 @@ async function read1PasswordSecret(ref: string): Promise<string> {
 export async function getSecret(name: string): Promise<string | null> {
   const store = await loadStore();
   const secret = store.secrets[name];
-  
+
   if (!secret) {
     return null;
+  }
+
+  // Keychain mode: resolve via macOS Keychain (used when running inside the app)
+  if (isKeychainMode()) {
+    return resolveFromKeychain(name);
   }
 
   if (secret.source.type === '1password') {
@@ -212,11 +231,16 @@ export async function removeSecret(name: string): Promise<boolean> {
     return false;
   }
 
+  // Remove from Keychain if in Keychain mode
+  if (isKeychainMode()) {
+    await deleteFromKeychain(name);
+  }
+
   delete store.secrets[name];
-  
+
   // Also clear from cache if 1password
   opCache.delete(name);
-  
+
   await saveStore(store);
   return true;
 }
@@ -234,10 +258,15 @@ export async function rotateSecret(name: string, newValue: string): Promise<{ pr
     throw new Error('Cannot rotate 1Password secrets. Update the value in 1Password instead.');
   }
 
-  const masterKey = await getMasterKey();
   const previousUsageCount = secret.usageCount;
 
-  secret.source = { type: 'encrypted', encryptedValue: encrypt(newValue, masterKey) };
+  if (isKeychainMode()) {
+    await storeInKeychain(name, newValue);
+  } else {
+    const masterKey = await getMasterKey();
+    secret.source = { type: 'encrypted', encryptedValue: encrypt(newValue, masterKey) };
+  }
+
   secret.createdAt = new Date().toISOString();
   secret.lastUsed = null;
   secret.usageCount = 0;

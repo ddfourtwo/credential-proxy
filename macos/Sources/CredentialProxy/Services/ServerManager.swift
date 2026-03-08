@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import Security
 
 @MainActor
 final class ServerManager: ObservableObject {
@@ -24,14 +25,22 @@ final class ServerManager: ObservableObject {
         if FileManager.default.fileExists(atPath: installed) {
             return installed
         }
-        // Dev fallback: relative to binary
         return ""
+    }
+
+    private var resolverPath: String? {
+        if let resourcePath = Bundle.main.resourcePath {
+            let path = "\(resourcePath)/credential-proxy-resolve"
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+        return nil
     }
 
     init(port: Int = 8787) {
         self.port = port
-        // Generate or load management token
-        self.mgmtToken = ServerManager.loadOrCreateToken()
+        self.mgmtToken = ServerManager.loadOrCreateKeychainToken()
     }
 
     func start() {
@@ -45,9 +54,14 @@ final class ServerManager: ObservableObject {
         proc.arguments = ["node", serverPath, "serve", "--port", "\(port)"]
         proc.environment = ProcessInfo.processInfo.environment
         proc.environment?["CREDENTIAL_PROXY_MGMT_TOKEN"] = mgmtToken
-        proc.environment?["CREDENTIAL_PROXY_USE_KEYCHAIN"] = "1"
+        proc.environment?["CREDENTIAL_PROXY_KEYCHAIN"] = "1"
 
-        // Use app support dir for data
+        // Point resolver to the bundled binary
+        if let resolver = resolverPath {
+            proc.environment?["CREDENTIAL_PROXY_RESOLVER_PATH"] = resolver
+        }
+
+        // Use app support dir for metadata
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dataDir = appSupport.appendingPathComponent("CredentialProxy").path
         try? FileManager.default.createDirectory(atPath: dataDir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -67,8 +81,6 @@ final class ServerManager: ObservableObject {
             try proc.run()
             process = proc
             statusMessage = "Starting server..."
-
-            // Start health check polling
             startHealthChecks()
         } catch {
             statusMessage = "Failed to start: \(error.localizedDescription)"
@@ -108,15 +120,26 @@ final class ServerManager: ObservableObject {
         }
     }
 
-    private static func loadOrCreateToken() -> String {
-        let tokenFile = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("CredentialProxy")
-            .appendingPathComponent(".mgmt-token")
+    // MARK: - Keychain-based token storage
 
-        // Try to load existing token
-        if let existing = try? String(contentsOf: tokenFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
-           !existing.isEmpty {
-            return existing
+    private static let tokenService = "com.credential-proxy.mgmt-token"
+    private static let tokenAccount = "management"
+
+    private static func loadOrCreateKeychainToken() -> String {
+        // Try to load from Keychain
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: tokenService,
+            kSecAttrAccount as String: tokenAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        if status == errSecSuccess, let data = result as? Data, let token = String(data: data, encoding: .utf8), !token.isEmpty {
+            return token
         }
 
         // Generate new token
@@ -124,11 +147,22 @@ final class ServerManager: ObservableObject {
         _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
         let token = bytes.map { String(format: "%02x", $0) }.joined()
 
-        // Save it
-        let dir = tokenFile.deletingLastPathComponent()
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        try? token.write(to: tokenFile, atomically: true, encoding: .utf8)
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tokenFile.path)
+        // Store in Keychain
+        let addQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: tokenService,
+            kSecAttrAccount as String: tokenAccount,
+            kSecValueData as String: token.data(using: .utf8)!,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            kSecAttrLabel as String: "Credential Proxy: Management Token"
+        ]
+        SecItemAdd(addQuery as CFDictionary, nil)
+
+        // Remove old file-based token if it exists
+        let oldTokenFile = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("CredentialProxy")
+            .appendingPathComponent(".mgmt-token")
+        try? FileManager.default.removeItem(at: oldTokenFile)
 
         return token
     }
