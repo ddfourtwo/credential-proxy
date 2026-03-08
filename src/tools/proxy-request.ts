@@ -288,7 +288,6 @@ export async function handleProxyRequest(
       redacted
     };
   } catch (error) {
-    const duration = Date.now() - startTime;
     return {
       error: 'REQUEST_FAILED',
       message: `Request to ${targetDomain} failed`,

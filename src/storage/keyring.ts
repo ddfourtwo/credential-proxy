@@ -52,7 +52,7 @@ async function tryKeytar(): Promise<typeof import('keytar') | null> {
       return null;
     }
     return keytar;
-  } catch (err) {
+  } catch {
     // Silently fall back to file-based storage
     return null;
   }
@@ -73,7 +73,7 @@ export async function getMasterKey(): Promise<string> {
       const newKey = generateMasterKey();
       await keytar.setPassword(SERVICE_NAME, ACCOUNT_NAME, newKey);
       return newKey;
-    } catch (err) {
+    } catch {
       // Keytar failed (e.g., no keychain access over SSH) - fall back to file
       console.error('[credential-proxy] Keychain access failed, using file-based key storage');
     }

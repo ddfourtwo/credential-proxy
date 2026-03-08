@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { readFile, writeFile, mkdir, cp, chmod, symlink, unlink, rm } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, cp, chmod, unlink, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';

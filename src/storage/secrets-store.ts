@@ -9,8 +9,7 @@ import {
   SecretsStore, 
   SecretMetadata, 
   SecretInfo, 
-  SecretPlacement, 
-  SecretSource,
+  SecretPlacement,
   LegacySecretMetadata,
   CURRENT_VERSION 
 } from './types.js';
@@ -161,7 +160,7 @@ async function read1PasswordSecret(ref: string): Promise<string> {
     return value;
   } catch (error) {
     const err = error as { stderr?: string; message?: string };
-    throw new Error(`Failed to read from 1Password: ${err.stderr || err.message}`);
+    throw new Error(`Failed to read from 1Password: ${err.stderr || err.message}`, { cause: error });
   }
 }
 
