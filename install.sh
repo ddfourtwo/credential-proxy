@@ -2,16 +2,15 @@
 set -euo pipefail
 
 # Credential Proxy installer
-# Builds the macOS app + Node.js MCP server and installs them
-# Secrets are stored in macOS Keychain — the agent never has file access to credentials
+# Builds the native macOS app (Swift HTTP server) + thin MCP relay (stdio→HTTP bridge)
+# All credential handling happens in compiled Swift — the agent cannot modify it
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_NAME="Credential Proxy.app"
 INSTALL_DIR="$HOME/Applications"
 APP_PATH="$INSTALL_DIR/$APP_NAME"
 CLAUDE_JSON="$HOME/.claude.json"
-MCP_SERVER_DIR="$APP_PATH/Contents/Resources/mcp-server"
-RESOLVER_BIN="$APP_PATH/Contents/Resources/credential-proxy-resolve"
+MCP_RELAY_DIR="$APP_PATH/Contents/Resources/mcp-relay"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -37,20 +36,20 @@ echo ""
 echo "Installing Credential Proxy..."
 echo ""
 
-# --- Step 1: Build Node.js MCP server ---
+# --- Step 1: Build Node.js MCP relay ---
 
-info "Building Node.js MCP server..."
+info "Building MCP relay (stdio → HTTP bridge)..."
 cd "$SCRIPT_DIR"
 
 if [ ! -d node_modules ]; then
     npm install --silent 2>/dev/null
 fi
 npm run build --silent 2>/dev/null
-success "Node.js server built"
+success "MCP relay built"
 
-# --- Step 2: Build Swift macOS app + resolver ---
+# --- Step 2: Build Swift macOS app ---
 
-info "Building macOS app..."
+info "Building macOS app (native HTTP server)..."
 cd "$SCRIPT_DIR/macos"
 swift build -c release --quiet 2>/dev/null
 SWIFT_BIN_DIR="$(swift build -c release --show-bin-path)"
@@ -71,26 +70,23 @@ fi
 # Create bundle structure
 mkdir -p "$APP_PATH/Contents/MacOS"
 mkdir -p "$APP_PATH/Contents/Resources"
-mkdir -p "$MCP_SERVER_DIR"
+mkdir -p "$MCP_RELAY_DIR"
 
-# Copy app binary
+# Copy app binary (includes native HTTP server — no Node.js server needed)
 cp "$SWIFT_BIN_DIR/CredentialProxy" "$APP_PATH/Contents/MacOS/CredentialProxy"
-
-# Copy resolver binary into Resources (Node.js server calls this to read Keychain)
-cp "$SWIFT_BIN_DIR/credential-proxy-resolve" "$RESOLVER_BIN"
 
 # Copy Info.plist
 cp "$SCRIPT_DIR/macos/Info.plist" "$APP_PATH/Contents/Info.plist"
 
-# Copy Node.js server files
-cp -R "$SCRIPT_DIR/dist/"* "$MCP_SERVER_DIR/"
-cp "$SCRIPT_DIR/package.json" "$MCP_SERVER_DIR/"
+# Copy MCP relay files (thin stdio→HTTP bridge, never touches secrets)
+cp -R "$SCRIPT_DIR/dist/"* "$MCP_RELAY_DIR/"
+cp "$SCRIPT_DIR/package.json" "$MCP_RELAY_DIR/"
 if [ -f "$SCRIPT_DIR/package-lock.json" ]; then
-    cp "$SCRIPT_DIR/package-lock.json" "$MCP_SERVER_DIR/"
+    cp "$SCRIPT_DIR/package-lock.json" "$MCP_RELAY_DIR/"
 fi
 
-# Install production dependencies in bundle
-cd "$MCP_SERVER_DIR"
+# Install production dependencies for relay (just @modelcontextprotocol/sdk)
+cd "$MCP_RELAY_DIR"
 npm ci --omit=dev --silent 2>/dev/null
 cd "$SCRIPT_DIR"
 
@@ -102,7 +98,7 @@ info "Configuring Claude Code MCP server..."
 
 # MCP stdio server in relay mode: forwards tool calls to the app's HTTP server.
 # The stdio server never accesses secrets directly.
-MCP_INDEX="$MCP_SERVER_DIR/index.js"
+MCP_INDEX="$MCP_RELAY_DIR/index.js"
 
 if [ -f "$CLAUDE_JSON" ]; then
     node -e "
@@ -137,12 +133,12 @@ else
         fs.writeFileSync('$CLAUDE_JSON', JSON.stringify(config, null, 2));
     "
 fi
-success "Claude Code MCP server configured (relay mode)"
+success "Claude Code MCP relay configured (stdio → native HTTP server)"
 
 # --- Step 5: Migrate existing secrets to Keychain ---
 
 OLD_DATA_DIR="$HOME/.local/share/credential-proxy"
-NEW_DATA_DIR="$HOME/Library/Application Support/CredentialProxy"
+NEW_DATA_DIR="$HOME/Library/Application Support/credential-proxy"
 
 mkdir -p "$NEW_DATA_DIR"
 chmod 700 "$NEW_DATA_DIR"
@@ -251,7 +247,8 @@ echo ""
 echo "  App:         $APP_PATH"
 echo "  Data:        $NEW_DATA_DIR"
 echo "  Secrets:     macOS Keychain (service: com.credential-proxy.secrets)"
-echo "  MCP Server:  Relay mode → http://127.0.0.1:8787"
+echo "  HTTP Server: Native Swift (compiled into app binary)"
+echo "  MCP Relay:   stdio → http://127.0.0.1:8787"
 echo ""
 echo "  The key icon in your menu bar indicates Credential Proxy is running."
 echo "  Click it to manage credentials."
