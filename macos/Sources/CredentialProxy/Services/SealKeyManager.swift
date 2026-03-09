@@ -39,7 +39,12 @@ final class SealKeyManager {
 
     /// Create a new seal key from a user-chosen PIN.
     /// Generates salt, derives key, stores salt + verification blob.
+    /// Throws `saltAlreadyExists` if called when seal data already exists — prevents
+    /// accidental overwrite of the salt which would make all stored secrets undecryptable.
     func setup(pin: String) throws {
+        guard isFirstRun else {
+            throw SealKeyError.saltAlreadyExists
+        }
         let salt = generateSalt()
         let key = try deriveKey(pin: pin, salt: salt)
 
@@ -349,6 +354,7 @@ enum SealKeyError: LocalizedError {
     case keyDerivationFailed
     case noSealData
     case binaryHashFailed
+    case saltAlreadyExists
 
     var errorDescription: String? {
         switch self {
@@ -358,6 +364,7 @@ enum SealKeyError: LocalizedError {
         case .keyDerivationFailed: return "Key derivation failed"
         case .noSealData: return "No seal data found — reinstall required"
         case .binaryHashFailed: return "Could not hash binary — cannot derive seal key"
+        case .saltAlreadyExists: return "Seal data already exists — use unlock() or reset() first"
         }
     }
 }
