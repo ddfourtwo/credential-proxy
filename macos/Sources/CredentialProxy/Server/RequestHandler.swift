@@ -4,9 +4,17 @@ import Foundation
 
 private struct RequestCredentialBody: Codable {
     let name: String?
+    let domains: [String]?
+    let placements: [String]?
+    let commands: [String]?
+    // Also accept allowedDomains/allowedPlacements/allowedCommands for direct API calls
     let allowedDomains: [String]?
     let allowedPlacements: [String]?
     let allowedCommands: [String]?
+
+    var resolvedDomains: [String]? { domains ?? allowedDomains }
+    var resolvedPlacements: [String]? { placements ?? allowedPlacements }
+    var resolvedCommands: [String]? { commands ?? allowedCommands }
 }
 
 private struct AddCredentialBody: Codable {
@@ -134,17 +142,17 @@ enum RequestHandler {
                 return .error(400, "name is required")
             }
 
-            guard let domains = parsed.allowedDomains, !domains.isEmpty else {
-                return .error(400, "allowedDomains is required and must not be empty")
+            guard let domains = parsed.resolvedDomains, !domains.isEmpty else {
+                return .error(400, "domains is required and must not be empty")
             }
 
-            let placements = parsed.allowedPlacements ?? ["header"]
+            let placements = parsed.resolvedPlacements ?? ["header"]
 
             let saved = await CredentialRequestManager.shared.requestCredential(
                 name: name.uppercased(),
                 domains: domains,
                 placements: placements,
-                commands: parsed.allowedCommands
+                commands: parsed.resolvedCommands
             )
 
             if saved {

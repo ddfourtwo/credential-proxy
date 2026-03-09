@@ -187,6 +187,14 @@ export async function handleProxyExec(
   // Find all placeholders
   const placeholders = findPlaceholders(input);
 
+  // Reject calls with no credential references
+  if (placeholders.length === 0) {
+    return {
+      error: 'EXEC_FAILED',
+      message: 'proxy_exec requires at least one {{SECRET}} placeholder. Use regular shell execution for commands that don\'t need credentials.'
+    };
+  }
+
   // Validate each placeholder
   for (const placeholder of placeholders) {
     const error = await validatePlaceholder(placeholder, input.command);

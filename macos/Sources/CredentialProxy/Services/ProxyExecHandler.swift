@@ -87,6 +87,14 @@ func handleProxyExec(
     // Find all placeholders
     let placeholders = findPlaceholders(in: input)
 
+    // Reject calls with no credential references — use regular bash instead
+    guard !placeholders.isEmpty else {
+        return .failure(ProxyExecError(
+            error: .execFailed,
+            message: "proxy_exec requires at least one {{SECRET}} placeholder. Use regular shell execution for commands that don't need credentials."
+        ))
+    }
+
     // Validate each placeholder
     for placeholder in placeholders {
         let metadata: SecretMetadata?
