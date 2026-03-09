@@ -5,6 +5,8 @@ struct MenuBarView: View {
     @EnvironmentObject var apiClient: APIClient
     @State private var credentials: [Credential] = []
     @State private var updateStatus: String?
+    @State private var showPinPrompt = false
+    @State private var pinInput = ""
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -85,11 +87,12 @@ struct MenuBarView: View {
             .padding(.horizontal, 12)
 
             Button {
-                do {
-                    try SealKeyManager.shared.prepareForUpdate()
-                    updateStatus = "Ready for update"
-                } catch {
-                    updateStatus = "Failed: \(error.localizedDescription)"
+                if SealKeyManager.shared.isUnlocked {
+                    doPrepareForUpdate()
+                } else {
+                    showPinPrompt = true
+                    pinInput = ""
+                    updateStatus = nil
                 }
             } label: {
                 Label("Prepare for Update", systemImage: "arrow.triangle.2.circlepath")
@@ -97,10 +100,22 @@ struct MenuBarView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 12)
 
+            if showPinPrompt {
+                HStack(spacing: 6) {
+                    SecureField("Enter PIN", text: $pinInput)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 120)
+                        .onSubmit { unlockAndPrepare() }
+                    Button("Go") { unlockAndPrepare() }
+                        .disabled(pinInput.isEmpty)
+                }
+                .padding(.horizontal, 12)
+            }
+
             if let status = updateStatus {
                 Text(status)
                     .font(.caption2)
-                    .foregroundStyle(status.hasPrefix("Failed") ? .red : .green)
+                    .foregroundStyle(status.hasPrefix("Failed") || status.hasPrefix("Wrong") ? .red : .green)
                     .padding(.horizontal, 12)
             }
 
@@ -125,5 +140,28 @@ struct MenuBarView: View {
                 credentials = (try? await apiClient.listCredentials()) ?? []
             }
         }
+    }
+
+    private func doPrepareForUpdate() {
+        do {
+            try SealKeyManager.shared.prepareForUpdate()
+            updateStatus = "Ready for update"
+            showPinPrompt = false
+        } catch {
+            updateStatus = "Failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func unlockAndPrepare() {
+        do {
+            if try SealKeyManager.shared.unlock(pin: pinInput) {
+                doPrepareForUpdate()
+            } else {
+                updateStatus = "Wrong PIN"
+            }
+        } catch {
+            updateStatus = "Failed: \(error.localizedDescription)"
+        }
+        pinInput = ""
     }
 }
