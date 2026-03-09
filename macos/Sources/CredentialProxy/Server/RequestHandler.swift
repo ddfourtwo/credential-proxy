@@ -2,6 +2,13 @@ import Foundation
 
 // MARK: - Request Body Types
 
+private struct RequestCredentialBody: Codable {
+    let name: String?
+    let allowedDomains: [String]?
+    let allowedPlacements: [String]?
+    let allowedCommands: [String]?
+}
+
 private struct AddCredentialBody: Codable {
     let name: String?
     let value: String?
@@ -108,6 +115,42 @@ enum RequestHandler {
                 case .execFailed: status = 500
                 }
                 return .json(status, error)
+            }
+        }
+
+        router.route("POST", "/request-credential") { request in
+            guard let body = request.body, !body.isEmpty else {
+                return .error(400, "Request body is required")
+            }
+
+            let parsed: RequestCredentialBody
+            do {
+                parsed = try JSONDecoder().decode(RequestCredentialBody.self, from: body)
+            } catch {
+                return .error(400, "Invalid JSON")
+            }
+
+            guard let name = parsed.name, !name.isEmpty else {
+                return .error(400, "name is required")
+            }
+
+            guard let domains = parsed.allowedDomains, !domains.isEmpty else {
+                return .error(400, "allowedDomains is required and must not be empty")
+            }
+
+            let placements = parsed.allowedPlacements ?? ["header"]
+
+            let saved = await CredentialRequestManager.shared.requestCredential(
+                name: name.uppercased(),
+                domains: domains,
+                placements: placements,
+                commands: parsed.allowedCommands
+            )
+
+            if saved {
+                return .json(200, ["success": AnyCodableValue.bool(true)])
+            } else {
+                return .json(200, ["cancelled": AnyCodableValue.bool(true)])
             }
         }
 

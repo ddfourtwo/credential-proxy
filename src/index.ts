@@ -7,6 +7,7 @@ import {
 import { listCredentialsTool, handleListCredentials } from './tools/list-credentials.js';
 import { proxyRequestTool, handleProxyRequest } from './tools/proxy-request.js';
 import { proxyExecTool, handleProxyExec } from './tools/proxy-exec.js';
+import { requestCredentialTool } from './tools/request-credential.js';
 import type { ListCredentialsInput } from './tools/list-credentials.js';
 import type { ProxyRequestInput } from './tools/proxy-request.js';
 import type { ProxyExecInput } from './tools/proxy-exec.js';
@@ -55,7 +56,7 @@ const server = new Server(
 // List available tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
-    tools: [listCredentialsTool, proxyRequestTool, proxyExecTool],
+    tools: [listCredentialsTool, proxyRequestTool, proxyExecTool, requestCredentialTool],
   };
 });
 
@@ -81,6 +82,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case 'proxy_exec':
           result = await relayToApp('/exec', 'POST', args);
           break;
+        case 'request_credential':
+          result = await relayToApp('/request-credential', 'POST', args);
+          break;
         default:
           return {
             content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
@@ -99,6 +103,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case 'proxy_exec':
           result = await handleProxyExec(args as unknown as ProxyExecInput);
           break;
+        case 'request_credential':
+          return {
+            content: [{ type: 'text' as const, text: 'request_credential requires the macOS app. Set CREDENTIAL_PROXY_APP_URL to use this tool.' }],
+            isError: true,
+          };
         default:
           return {
             content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
