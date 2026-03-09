@@ -18,6 +18,7 @@ enum SecretPlacement: String, Codable, CaseIterable {
 enum SecretSource: Codable {
     case encrypted(encryptedValue: String)
     case onePassword(ref: String)
+    case keychain
 
     private enum CodingKeys: String, CodingKey {
         case type
@@ -35,6 +36,8 @@ enum SecretSource: Codable {
         case "1password":
             let ref = try container.decode(String.self, forKey: .ref)
             self = .onePassword(ref: ref)
+        case "keychain":
+            self = .keychain
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .type,
@@ -53,6 +56,8 @@ enum SecretSource: Codable {
         case .onePassword(let ref):
             try container.encode("1password", forKey: .type)
             try container.encode(ref, forKey: .ref)
+        case .keychain:
+            try container.encode("keychain", forKey: .type)
         }
     }
 }

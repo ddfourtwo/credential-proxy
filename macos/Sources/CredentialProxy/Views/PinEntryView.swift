@@ -55,15 +55,28 @@ struct PinEntryView: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(currentPin.isEmpty)
             }
+
+            if showResetConfirm {
+                Divider()
+                VStack(spacing: 8) {
+                    Text("This will delete all encrypted secrets. You will need to re-add your credentials after setting a new PIN.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    HStack(spacing: 12) {
+                        Button("Cancel") { showResetConfirm = false }
+                        Button("Reset Everything") { doReset() }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.red)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                }
+            }
         }
         .padding(32)
         .frame(width: 320)
-        .alert("Reset Credential Proxy?", isPresented: $showResetConfirm) {
-            Button("Cancel", role: .cancel) {}
-            Button("Reset", role: .destructive) { doReset() }
-        } message: {
-            Text("This will delete all encrypted secrets. You will need to re-add your credentials after setting a new PIN.")
-        }
     }
 
     private var currentPin: String { isConfirming ? confirmPin : pin }

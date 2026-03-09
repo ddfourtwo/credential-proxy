@@ -135,6 +135,8 @@ actor SecretStore {
             switch meta.source {
             case .encrypted:
                 sourceType = "encrypted"
+            case .keychain:
+                sourceType = "keychain"
             case .onePassword:
                 sourceType = "1password"
             }
