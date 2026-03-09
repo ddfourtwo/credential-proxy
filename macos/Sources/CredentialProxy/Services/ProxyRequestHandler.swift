@@ -22,6 +22,9 @@ enum ProxyRequestHandler {
     private static func findPlaceholders(in input: ProxyRequestInput) -> [PlaceholderInfo] {
         var placeholders: [PlaceholderInfo] = []
 
+        // Check URL path
+        placeholders += scanPlaceholders(in: input.url, placement: .url)
+
         // Check headers
         if let headers = input.headers {
             for (_, value) in headers {

@@ -76,6 +76,19 @@ interface PlaceholderInfo {
 function findPlaceholders(input: ProxyRequestInput): PlaceholderInfo[] {
   const placeholders: PlaceholderInfo[] = [];
 
+  // Check URL path
+  {
+    let match;
+    while ((match = PLACEHOLDER_REGEX.exec(input.url)) !== null) {
+      placeholders.push({
+        name: match[1],
+        placement: 'url',
+        fullMatch: match[0]
+      });
+    }
+    PLACEHOLDER_REGEX.lastIndex = 0;
+  }
+
   // Check headers
   if (input.headers) {
     for (const [, value] of Object.entries(input.headers)) {

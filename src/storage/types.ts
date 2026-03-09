@@ -22,7 +22,7 @@ export interface LegacySecretMetadata {
   usageCount: number;
 }
 
-export type SecretPlacement = 'header' | 'body' | 'query' | 'env' | 'arg';
+export type SecretPlacement = 'header' | 'body' | 'query' | 'url' | 'env' | 'arg';
 
 export interface SecretsStore {
   version: number;

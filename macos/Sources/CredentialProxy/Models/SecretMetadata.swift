@@ -8,6 +8,7 @@ enum SecretPlacement: String, Codable, CaseIterable {
     case header
     case body
     case query
+    case url
     case env
     case arg
 }

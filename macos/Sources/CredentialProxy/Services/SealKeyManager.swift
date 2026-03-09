@@ -22,11 +22,13 @@ final class SealKeyManager {
 
     private var saltPath: String { dataDir + "/seal.salt" }
     private var verifyPath: String { dataDir + "/seal.verify" }
+    private var migrationPath: String { dataDir + "/seal.migration" }
 
     private let verificationPlaintext = "credential-proxy-seal-key-valid"
     private let pbkdf2Iterations: UInt32 = 200_000
 
     private(set) var cachedKey: SymmetricKey?
+    private var cachedPin: String?
 
     var isUnlocked: Bool { cachedKey != nil }
     var isFirstRun: Bool { !FileManager.default.fileExists(atPath: saltPath) }
@@ -53,6 +55,7 @@ final class SealKeyManager {
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: verifyPath)
 
         cachedKey = key
+        cachedPin = pin
     }
 
     // MARK: - Unlock (subsequent launches)
@@ -75,6 +78,7 @@ final class SealKeyManager {
         }
 
         cachedKey = key
+        cachedPin = pin
         return true
     }
 
@@ -84,13 +88,159 @@ final class SealKeyManager {
     func reset() {
         try? FileManager.default.removeItem(atPath: saltPath)
         try? FileManager.default.removeItem(atPath: verifyPath)
+        try? FileManager.default.removeItem(atPath: migrationPath)
         cachedKey = nil
+        cachedPin = nil
         // Delete all stored secrets from Keychain (they can't be decrypted anymore)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "com.credential-proxy.secrets"
         ]
         SecItemDelete(query as CFDictionary)
+    }
+
+    // MARK: - Update Migration
+
+    var hasPendingMigration: Bool {
+        FileManager.default.fileExists(atPath: migrationPath)
+    }
+
+    /// Prepare for binary update: re-encrypt all Keychain secrets with a migration key
+    /// (PIN + salt, no binary hash) so the new binary can decrypt them.
+    func prepareForUpdate() throws {
+        guard let key = cachedKey else { throw SealKeyError.notUnlocked }
+        guard let salt = try? Data(contentsOf: URL(fileURLWithPath: saltPath)) else {
+            throw SealKeyError.noSealData
+        }
+
+        guard let pin = cachedPin else { throw SealKeyError.notUnlocked }
+        let migrationKey = try deriveMigrationKey(pin: pin, salt: salt)
+
+        // Read all secrets from Keychain, decrypt with current key, re-encrypt with migration key
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.credential-proxy.secrets",
+            kSecReturnAttributes as String: true,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        var migrated: [[String: Data]] = []
+
+        if status == errSecSuccess, let items = result as? [[String: Any]] {
+            for item in items {
+                guard let account = item[kSecAttrAccount as String] as? String,
+                      let data = item[kSecValueData as String] as? Data else { continue }
+
+                // Decrypt with current key (binary-bound)
+                guard let plaintext = try? decrypt(data, key: key) else { continue }
+
+                // Re-encrypt with migration key (no binary hash)
+                let migrationData = try encrypt(plaintext, key: migrationKey)
+                migrated.append([
+                    "name": Data(account.utf8),
+                    "data": migrationData
+                ])
+            }
+        }
+
+        // Also re-encrypt the verification string with migration key
+        let verifyMigration = try encrypt(verificationPlaintext, key: migrationKey)
+
+        // Write migration blob: [verify, secrets...]
+        let blob = try JSONEncoder().encode(MigrationBlob(
+            verify: verifyMigration,
+            secrets: migrated.map { dict in
+                MigrationSecret(
+                    name: String(data: dict["name"]!, encoding: .utf8)!,
+                    data: dict["data"]!
+                )
+            }
+        ))
+        try blob.write(to: URL(fileURLWithPath: migrationPath), options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: migrationPath)
+    }
+
+    /// After binary update: unlock with PIN using migration key, re-encrypt secrets with new binary-bound key.
+    func completeMigration(pin: String) throws -> Bool {
+        guard let salt = try? Data(contentsOf: URL(fileURLWithPath: saltPath)),
+              let blobData = try? Data(contentsOf: URL(fileURLWithPath: migrationPath)) else {
+            return false
+        }
+
+        let migrationKey = try deriveMigrationKey(pin: pin, salt: salt)
+        let blob = try JSONDecoder().decode(MigrationBlob.self, from: blobData)
+
+        // Verify PIN with migration key
+        guard let decrypted = try? decrypt(blob.verify, key: migrationKey),
+              decrypted == verificationPlaintext else {
+            return false // Wrong PIN
+        }
+
+        // Derive new binary-bound key
+        let newKey = try deriveKey(pin: pin, salt: salt)
+
+        // Re-encrypt each secret with the new key and update Keychain
+        for secret in blob.secrets {
+            guard let plaintext = try? decrypt(secret.data, key: migrationKey) else { continue }
+            let newData = try encrypt(plaintext, key: newKey)
+
+            let deleteQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: "com.credential-proxy.secrets",
+                kSecAttrAccount as String: secret.name
+            ]
+            SecItemDelete(deleteQuery as CFDictionary)
+
+            let addQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: "com.credential-proxy.secrets",
+                kSecAttrAccount as String: secret.name,
+                kSecValueData as String: newData,
+                kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+                kSecAttrLabel as String: "Credential Proxy: \(secret.name)"
+            ]
+            SecItemAdd(addQuery as CFDictionary, nil)
+        }
+
+        // Update verification blob for new key
+        let newVerify = try encrypt(verificationPlaintext, key: newKey)
+        try newVerify.write(to: URL(fileURLWithPath: verifyPath))
+
+        // Clean up migration file
+        try? FileManager.default.removeItem(atPath: migrationPath)
+
+        cachedKey = newKey
+        return true
+    }
+
+    /// Derive a key from PIN + salt only (no binary hash) for migration.
+    private func deriveMigrationKey(pin: String, salt: Data) throws -> SymmetricKey {
+        let pinData = Data(pin.utf8)
+        var derivedKey = Data(count: 32)
+
+        let status = derivedKey.withUnsafeMutableBytes { derivedBytes in
+            pinData.withUnsafeBytes { pinBytes in
+                salt.withUnsafeBytes { saltBytes in
+                    CCKeyDerivationPBKDF(
+                        CCPBKDFAlgorithm(kCCPBKDF2),
+                        pinBytes.baseAddress?.assumingMemoryBound(to: Int8.self),
+                        pinData.count,
+                        saltBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                        salt.count,
+                        CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256),
+                        pbkdf2Iterations,
+                        derivedBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                        32
+                    )
+                }
+            }
+        }
+
+        guard status == kCCSuccess else { throw SealKeyError.keyDerivationFailed }
+        return SymmetricKey(data: derivedKey)
     }
 
     // MARK: - Key Derivation
@@ -178,6 +328,18 @@ final class SealKeyManager {
         }
         return plaintext
     }
+}
+
+// MARK: - Migration Types
+
+private struct MigrationBlob: Codable {
+    let verify: Data
+    let secrets: [MigrationSecret]
+}
+
+private struct MigrationSecret: Codable {
+    let name: String
+    let data: Data
 }
 
 enum SealKeyError: LocalizedError {

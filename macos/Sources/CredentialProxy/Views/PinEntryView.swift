@@ -111,6 +111,13 @@ struct PinEntryView: View {
             }
         } else {
             do {
+                // Try migration first (binary was updated)
+                if seal.hasPendingMigration {
+                    if try seal.completeMigration(pin: pin) {
+                        onUnlocked()
+                        return
+                    }
+                }
                 if try seal.unlock(pin: pin) {
                     onUnlocked()
                 } else {

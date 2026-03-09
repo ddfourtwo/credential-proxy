@@ -4,6 +4,7 @@ struct MenuBarView: View {
     @EnvironmentObject var serverManager: ServerManager
     @EnvironmentObject var apiClient: APIClient
     @State private var credentials: [Credential] = []
+    @State private var updateStatus: String?
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -82,6 +83,26 @@ struct MenuBarView: View {
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 12)
+
+            Button {
+                do {
+                    try SealKeyManager.shared.prepareForUpdate()
+                    updateStatus = "Ready for update"
+                } catch {
+                    updateStatus = "Failed: \(error.localizedDescription)"
+                }
+            } label: {
+                Label("Prepare for Update", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+
+            if let status = updateStatus {
+                Text(status)
+                    .font(.caption2)
+                    .foregroundStyle(status.hasPrefix("Failed") ? .red : .green)
+                    .padding(.horizontal, 12)
+            }
 
             Divider()
 
