@@ -3,14 +3,23 @@ import SwiftUI
 struct CredentialProxyApp: App {
     @ObservedObject private var serverManager = ServerManager.shared
     @StateObject private var apiClient = APIClient()
+    @State private var isUnlocked = false
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView()
-                .environmentObject(serverManager)
-                .environmentObject(apiClient)
+            if !isUnlocked {
+                PinEntryView {
+                    isUnlocked = true
+                    ServerManager.startShared()
+                }
+                .padding(4)
+            } else {
+                MenuBarView()
+                    .environmentObject(serverManager)
+                    .environmentObject(apiClient)
+            }
         } label: {
-            Image(systemName: serverManager.isRunning ? "key.fill" : "key")
+            Image(systemName: isUnlocked && serverManager.isRunning ? "key.fill" : "key")
         }
         .menuBarExtraStyle(.window)
 

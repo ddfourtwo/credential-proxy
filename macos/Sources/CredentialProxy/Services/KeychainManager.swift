@@ -5,6 +5,10 @@ import Security
 /// Each secret is stored as a generic password with:
 ///   - service: "com.credential-proxy.secrets"
 ///   - account: the secret name (e.g., "GITHUB_TOKEN")
+///   - value: encrypted with the seal key (AES-256-GCM via SealKeyManager)
+///
+/// The seal key itself is protected by Touch ID — so secrets cannot be
+/// decrypted without user biometric approval at app startup.
 final class KeychainManager {
     static let shared = KeychainManager()
     private let service = "com.credential-proxy.secrets"
@@ -12,9 +16,8 @@ final class KeychainManager {
     private init() {}
 
     func store(name: String, value: String) throws {
-        guard let data = value.data(using: .utf8) else {
-            throw KeychainError.encodingFailed
-        }
+        // Encrypt the value with the seal key
+        let encrypted = try SealKeyManager.shared.encrypt(value)
 
         // Delete existing item first (update = delete + add)
         let deleteQuery: [String: Any] = [
@@ -28,7 +31,7 @@ final class KeychainManager {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: name,
-            kSecValueData as String: data,
+            kSecValueData as String: encrypted,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
             kSecAttrLabel as String: "Credential Proxy: \(name)"
         ]
@@ -57,7 +60,20 @@ final class KeychainManager {
         guard status == errSecSuccess, let data = result as? Data else {
             throw KeychainError.retrieveFailed(status)
         }
-        return String(data: data, encoding: .utf8)
+
+        // Try to decrypt with seal key (normal path)
+        if let decrypted = try? SealKeyManager.shared.decrypt(data) {
+            return decrypted
+        }
+
+        // Legacy fallback: unencrypted value from before seal key was introduced.
+        // Transparently re-encrypt it for next time.
+        if let plaintext = String(data: data, encoding: .utf8) {
+            try? store(name: name, value: plaintext)
+            return plaintext
+        }
+
+        return nil
     }
 
     func delete(name: String) throws {

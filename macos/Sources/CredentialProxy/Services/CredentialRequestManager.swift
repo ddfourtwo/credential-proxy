@@ -40,6 +40,7 @@ class CredentialRequestManager {
                     guard !hasResumed else { return }
                     hasResumed = true
                     window.close()
+                    NSApplication.shared.setActivationPolicy(.accessory)
                     continuation.resume(returning: saved)
                 }
 
@@ -53,18 +54,24 @@ class CredentialRequestManager {
                 ) { _ in
                     guard !hasResumed else { return }
                     hasResumed = true
+                    NSApplication.shared.setActivationPolicy(.accessory)
                     continuation.resume(returning: false)
                 }
 
-                // Bring app to front and show the window
+                // Float above everything and activate app
+                window.level = .floating
+                NSApplication.shared.setActivationPolicy(.regular)
                 NSApplication.shared.activate(ignoringOtherApps: true)
                 window.makeKeyAndOrderFront(nil)
+                window.orderFrontRegardless()
+
 
                 // 5-minute timeout
                 DispatchQueue.main.asyncAfter(deadline: .now() + 300) {
                     guard !hasResumed else { return }
                     hasResumed = true
                     window.close()
+                    NSApplication.shared.setActivationPolicy(.accessory)
                     continuation.resume(returning: false)
                 }
             }

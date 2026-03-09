@@ -90,7 +90,12 @@ cd "$MCP_RELAY_DIR"
 npm ci --omit=dev --silent 2>/dev/null
 cd "$SCRIPT_DIR"
 
-success "App bundle created at $APP_PATH"
+# Ad-hoc sign the binary — Keychain ACLs are bound to this signature.
+# A rebuilt binary gets a different signature, so Keychain will prompt
+# the user before granting access. This prevents agents from silently
+# rebuilding to exfiltrate secrets.
+codesign -s - -f "$APP_PATH/Contents/MacOS/CredentialProxy" 2>/dev/null
+success "App bundle created and signed at $APP_PATH"
 
 # --- Step 4: Register MCP server in Claude config ---
 
