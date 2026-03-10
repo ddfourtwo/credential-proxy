@@ -3,10 +3,9 @@ import { getSecret, secretExists } from '../../storage/secrets-store.js';
 import { colors } from '../utils.js';
 
 export const showCommand = new Command('show')
-  .description('Reveal the decrypted value of a secret')
+  .description('Show a secret (masked)')
   .argument('<name>', 'Secret name to reveal')
-  .option('--no-mask', 'Show full value (default shows masked)')
-  .action(async (name: string, options: { mask: boolean }) => {
+  .action(async (name: string) => {
     try {
       if (!await secretExists(name)) {
         console.error(colors.red(`Error: Secret "${name}" not found`));
@@ -20,16 +19,11 @@ export const showCommand = new Command('show')
         process.exit(1);
       }
 
-      if (options.mask) {
-        // Show first 4 and last 4 chars, mask the rest
-        const masked = value.length > 12
-          ? `${value.slice(0, 4)}${'*'.repeat(Math.min(value.length - 8, 20))}${value.slice(-4)}`
-          : '*'.repeat(value.length);
-        console.log(`${colors.bold(name)}: ${masked}`);
-        console.log(colors.dim('Use --no-mask to reveal full value'));
-      } else {
-        console.log(value);
-      }
+      // Show first 4 and last 4 chars, mask the rest
+      const masked = value.length > 12
+        ? `${value.slice(0, 4)}${'*'.repeat(Math.min(value.length - 8, 20))}${value.slice(-4)}`
+        : '*'.repeat(value.length);
+      console.log(`${colors.bold(name)}: ${masked}`);
     } catch (error) {
       console.error(colors.red(`Error: ${error instanceof Error ? error.message : String(error)}`));
       process.exit(1);
