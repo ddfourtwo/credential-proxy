@@ -7,13 +7,36 @@ import Security
 ///   - account: the secret name (e.g., "GITHUB_TOKEN")
 ///   - value: encrypted with the seal key (AES-256-GCM via SealKeyManager)
 ///
-/// The seal key itself is protected by Touch ID — so secrets cannot be
-/// decrypted without user biometric approval at app startup.
+/// Uses a permissive SecAccess so that rebuilds of the binary don't trigger
+/// per-credential Keychain password prompts. Security is provided by the
+/// seal key encryption, not Keychain ACLs.
 final class KeychainManager {
     static let shared = KeychainManager()
     private let service = "com.credential-proxy.secrets"
 
     private init() {}
+
+    /// Create a SecAccess that allows any application to access the item.
+    /// This prevents macOS from prompting for each credential after a binary rebuild.
+    private func createPermissiveAccess(label: String) -> SecAccess? {
+        var access: SecAccess?
+        let status = SecAccessCreate(label as CFString, nil, &access)
+        guard status == errSecSuccess, let access = access else { return nil }
+
+        // Get all ACLs and remove the trusted app restriction from each
+        guard let acls = SecAccessCopyMatchingACLList(access, kSecACLAuthorizationAny) as? [SecACL] else {
+            return access
+        }
+        for acl in acls {
+            var apps: CFArray?
+            var desc: CFString?
+            var prompt: SecKeychainPromptSelector = []
+            SecACLCopyContents(acl, &apps, &desc, &prompt)
+            // nil apps = any application can access (no per-app restriction)
+            SecACLSetContents(acl, nil, desc ?? "" as CFString, prompt)
+        }
+        return access
+    }
 
     func store(name: String, value: String) throws {
         // Encrypt the value with the seal key
@@ -27,7 +50,7 @@ final class KeychainManager {
         ]
         SecItemDelete(deleteQuery as CFDictionary)
 
-        let addQuery: [String: Any] = [
+        var addQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: name,
@@ -35,6 +58,9 @@ final class KeychainManager {
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
             kSecAttrLabel as String: "Credential Proxy: \(name)"
         ]
+        if let access = createPermissiveAccess(label: "Credential Proxy: \(name)") {
+            addQuery[kSecAttrAccess as String] = access
+        }
 
         let status = SecItemAdd(addQuery as CFDictionary, nil)
         guard status == errSecSuccess else {

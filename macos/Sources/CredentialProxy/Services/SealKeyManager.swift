@@ -127,7 +127,7 @@ final class SealKeyManager {
             kSecAttrService as String: "com.credential-proxy.secrets",
             kSecReturnAttributes as String: true,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitAll
+            kSecMatchLimit as String: kSecMatchLimitAll,
         ]
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -195,8 +195,8 @@ final class SealKeyManager {
             let deleteQuery: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: "com.credential-proxy.secrets",
-                kSecAttrAccount as String: secret.name
-            ]
+                kSecAttrAccount as String: secret.name,
+                ]
             SecItemDelete(deleteQuery as CFDictionary)
 
             let addQuery: [String: Any] = [
@@ -205,8 +205,8 @@ final class SealKeyManager {
                 kSecAttrAccount as String: secret.name,
                 kSecValueData as String: newData,
                 kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-                kSecAttrLabel as String: "Credential Proxy: \(secret.name)"
-            ]
+                kSecAttrLabel as String: "Credential Proxy: \(secret.name)",
+                ]
             SecItemAdd(addQuery as CFDictionary, nil)
         }
 
