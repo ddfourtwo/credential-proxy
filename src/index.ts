@@ -8,6 +8,7 @@ import { listCredentialsTool, handleListCredentials } from './tools/list-credent
 import { proxyRequestTool, handleProxyRequest } from './tools/proxy-request.js';
 import { proxyExecTool, handleProxyExec } from './tools/proxy-exec.js';
 import { requestCredentialTool } from './tools/request-credential.js';
+import type { RequestCredentialInput } from './tools/request-credential.js';
 import type { ListCredentialsInput } from './tools/list-credentials.js';
 import type { ProxyRequestInput } from './tools/proxy-request.js';
 import type { ProxyExecInput } from './tools/proxy-exec.js';
@@ -87,9 +88,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case 'proxy_exec':
           result = await relayToApp('/exec', 'POST', args);
           break;
-        case 'request_credential':
+        case 'request_credential': {
+          const reqArgs = args as unknown as RequestCredentialInput;
+          // Check if credential already exists before prompting the user
+          const existing = await relayToApp('/credentials', 'GET') as { secrets?: Array<{ name: string }> };
+          if (existing?.secrets?.some(s => s.name === reqArgs.name) && !reqArgs.overwrite) {
+            return {
+              content: [{ type: 'text' as const, text: `Credential '${reqArgs.name}' already exists. If you intend to replace it, call request_credential again with overwrite: true. Please confirm with the user first.` }],
+              isError: true,
+            };
+          }
           result = await relayToApp('/request-credential', 'POST', args);
           break;
+        }
         default:
           return {
             content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],

@@ -82,11 +82,22 @@ export const installCommand = new Command('install')
       }
 
       const mcpServers = (claudeConfig.mcpServers ?? {}) as Record<string, unknown>;
-      mcpServers['credential-proxy'] = {
+      const mcpEntry: Record<string, unknown> = {
         type: 'stdio',
         command: 'node',
         args: [join(INSTALL_DIR, 'index.js')]
       };
+
+      // If the macOS app is installed, set relay mode so the MCP server
+      // forwards tool calls to the app's HTTP server (which holds the secrets).
+      const appPath = join(homedir(), 'Applications', 'Credential Proxy.app');
+      if (existsSync(appPath)) {
+        mcpEntry.env = {
+          CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111'
+        };
+      }
+
+      mcpServers['credential-proxy'] = mcpEntry;
       claudeConfig.mcpServers = mcpServers;
 
       await writeFile(CLAUDE_JSON, JSON.stringify(claudeConfig, null, 2));
