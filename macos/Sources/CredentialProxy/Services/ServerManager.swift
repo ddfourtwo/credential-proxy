@@ -13,7 +13,7 @@ final class ServerManager: ObservableObject {
     private let mgmtToken: String
     private var healthCheckTimer: Timer?
 
-    init(port: UInt16 = 8787) {
+    init(port: UInt16 = 11111) {
         self.port = port
         // Generate ephemeral token in memory — never written to disk.
         // Management endpoints are only used by the in-process UI.

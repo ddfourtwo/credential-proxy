@@ -38,7 +38,12 @@ async function relayToApp(
   }
 
   const res = await fetch(url.toString(), opts);
-  return res.json();
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`App server returned ${res.status}: ${text.slice(0, 200)}`);
+  }
 }
 
 const server = new Server(

@@ -31,7 +31,7 @@ struct SettingsView: View {
 
             Section("About") {
                 LabeledContent("Version", value: "1.0.0")
-                LabeledContent("Server", value: "Native (port 8787)")
+                LabeledContent("Server", value: "Native (port 11111)")
             }
         }
         .formStyle(.grouped)

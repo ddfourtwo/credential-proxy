@@ -35,8 +35,8 @@ launchctl load "$PLIST_DEST"
 
 # Verify
 sleep 2
-if curl -s http://127.0.0.1:8787/health | grep -q "ok"; then
-    echo "✅ credential-proxy HTTP server running on port 8787"
+if curl -s http://127.0.0.1:11111/health | grep -q "ok"; then
+    echo "✅ credential-proxy HTTP server running on port 11111"
     echo ""
     echo "Service commands:"
     echo "  Stop:    launchctl unload ~/Library/LaunchAgents/$PLIST_NAME"

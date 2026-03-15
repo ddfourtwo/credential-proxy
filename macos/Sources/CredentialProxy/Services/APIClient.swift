@@ -5,7 +5,7 @@ final class APIClient: ObservableObject {
     private let baseURL: URL
     private var mgmtToken: String?
 
-    init(port: Int = 8787) {
+    init(port: Int = 11111) {
         self.baseURL = URL(string: "http://127.0.0.1:\(port)")!
     }
 

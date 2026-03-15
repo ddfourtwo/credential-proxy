@@ -20,7 +20,7 @@ The credential handling runs in a **compiled Swift binary** embedded in a macOS 
 ```
 
 ```
-Claude Code → MCP stdio relay (Node.js, thin) → HTTP :8787 (Swift, compiled) → Keychain
+Claude Code → MCP stdio relay (Node.js, thin) → HTTP :11111 (Swift, compiled) → Keychain
 ```
 
 The agent asks: *"POST to `https://api.linear.app/graphql` with header `Authorization: Bearer {{LINEAR_API_KEY}}`"*
@@ -52,6 +52,16 @@ The installer:
 6. Launches the app
 
 Restart Claude Code after install to load the MCP server.
+
+### Updating
+
+```bash
+# 1. Click "Prepare for Update" in the menu bar (required — script blocks without it)
+# 2. Run:
+./reinstall.sh
+# 3. Enter your PIN in the menu bar to complete migration
+# 4. Restart Claude Code
+```
 
 ## Quick Start
 
@@ -256,7 +266,7 @@ proxy_exec({
 - **Placement validation** — control whether a secret can appear in headers, body, query params, env vars, or command args
 - **Response redaction** — all output scanned for secret values (>= 6 chars) and replaced with `[REDACTED:SECRET_NAME]`
 - **Audit logging** — all usage logged to `~/Library/Application Support/credential-proxy/audit.log` with rotation at 10MB
-- **Localhost only** — HTTP server binds to `127.0.0.1:8787`, not accessible from the network
+- **Localhost only** — HTTP server binds to `127.0.0.1:11111`, not accessible from the network
 
 ### 1Password Integration
 
@@ -293,8 +303,11 @@ npm run test        # run tests (vitest)
 # Build the Swift server
 cd macos && swift build -c release
 
-# Full install (builds everything + creates app bundle)
+# Fresh install (builds everything + creates app bundle)
 bash install.sh
+
+# Update existing installation (requires "Prepare for Update" in menu bar)
+./reinstall.sh
 ```
 
 ## License

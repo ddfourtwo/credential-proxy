@@ -115,7 +115,7 @@ if [ -f "$CLAUDE_JSON" ]; then
             command: 'node',
             args: ['$MCP_INDEX'],
             env: {
-                CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:8787'
+                CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111'
             }
         };
         fs.writeFileSync('$CLAUDE_JSON', JSON.stringify(config, null, 2));
@@ -130,7 +130,7 @@ else
                     command: 'node',
                     args: ['$MCP_INDEX'],
                     env: {
-                        CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:8787'
+                        CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111'
                     }
                 }
             }
@@ -253,7 +253,7 @@ echo "  App:         $APP_PATH"
 echo "  Data:        $NEW_DATA_DIR"
 echo "  Secrets:     macOS Keychain (service: com.credential-proxy.secrets)"
 echo "  HTTP Server: Native Swift (compiled into app binary)"
-echo "  MCP Relay:   stdio → http://127.0.0.1:8787"
+echo "  MCP Relay:   stdio → http://127.0.0.1:11111"
 echo ""
 echo "  The key icon in your menu bar indicates Credential Proxy is running."
 echo "  Click it to manage credentials."

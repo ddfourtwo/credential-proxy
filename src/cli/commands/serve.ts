@@ -3,7 +3,7 @@ import { startHttpServer } from '../../http-server.js';
 
 export const serveCommand = new Command('serve')
   .description('Start HTTP server for credential proxy (allows non-MCP clients)')
-  .option('-p, --port <port>', 'Port to listen on', '8787')
+  .option('-p, --port <port>', 'Port to listen on', '11111')
   .option('-H, --host <host>', 'Host to bind to', '127.0.0.1')
   .action(async (options) => {
     const port = parseInt(options.port, 10);
