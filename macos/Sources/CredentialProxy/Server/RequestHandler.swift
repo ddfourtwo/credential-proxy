@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 // MARK: - Request Body Types
@@ -262,6 +263,61 @@ enum RequestHandler {
                     "name": AnyCodableValue.string(name),
                     "previousUsageCount": AnyCodableValue.int(previousUsageCount),
                 ])
+            } catch {
+                return .error(500, error.localizedDescription)
+            }
+        }
+
+        router.route("POST", "/validate-hmac") { request in
+            guard let body = request.body, !body.isEmpty else {
+                return .error(400, "Request body is required")
+            }
+
+            struct ValidateHMACInput: Decodable {
+                let secretName: String
+                let algorithm: String
+                let payload: String  // base64-encoded
+                let signature: String
+                let encoding: String
+                let prefix: String?
+            }
+
+            guard let input = try? JSONDecoder().decode(ValidateHMACInput.self, from: body) else {
+                return .error(400, "Invalid JSON: requires secretName, algorithm, payload, signature, encoding")
+            }
+
+            guard input.algorithm == "sha256" else {
+                return .error(400, "Unsupported algorithm: \(input.algorithm). Only sha256 is supported.")
+            }
+
+            do {
+                guard let secret = try await secretStore.getSecret(name: input.secretName) else {
+                    return .error(404, "Secret not found: \(input.secretName)")
+                }
+
+                guard let payloadData = Data(base64Encoded: input.payload) else {
+                    return .error(400, "Invalid base64 payload")
+                }
+
+                let key = SymmetricKey(data: Data(secret.utf8))
+                let computed = HMAC<SHA256>.authenticationCode(for: payloadData, using: key)
+                let computedHex = computed.map { String(format: "%02x", $0) }.joined()
+
+                var providedSig = input.signature
+                if let prefix = input.prefix, !prefix.isEmpty, providedSig.hasPrefix(prefix) {
+                    providedSig = String(providedSig.dropFirst(prefix.count))
+                }
+
+                // Constant-time comparison
+                let computedBytes = Array(computedHex.utf8)
+                let providedBytes = Array(providedSig.utf8)
+                var match = computedBytes.count == providedBytes.count
+                for i in 0..<min(computedBytes.count, providedBytes.count) {
+                    match = match && (computedBytes[i] == providedBytes[i])
+                }
+                if computedBytes.count != providedBytes.count { match = false }
+
+                return .json(200, ["valid": AnyCodableValue.bool(match)])
             } catch {
                 return .error(500, error.localizedDescription)
             }
