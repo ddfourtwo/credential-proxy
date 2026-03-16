@@ -1,10 +1,11 @@
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { handleProxyRequest, type ProxyRequestInput } from './tools/proxy-request.js';
 import { handleProxyExec, type ProxyExecInput } from './tools/proxy-exec.js';
 import { handleListCredentials, type ListCredentialsInput } from './tools/list-credentials.js';
-import { addSecret, removeSecret, rotateSecret } from './storage/secrets-store.js';
+import { addSecret, removeSecret, rotateSecret, getSecret } from './storage/secrets-store.js';
 import { getAuditLogPath } from './storage/keyring.js';
 import type { SecretPlacement } from './storage/types.js';
 
@@ -254,6 +255,50 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
       return;
     }
 
+    // Validate HMAC signature
+    if (path === '/validate-hmac' && method === 'POST') {
+      const bodyStr = await parseBody(req);
+      if (!bodyStr) { sendError(res, 400, 'Request body is required'); return; }
+
+      let body: {
+        secretName?: string;
+        algorithm?: string;
+        payload?: string;
+        signature?: string;
+        encoding?: string;
+        prefix?: string;
+      };
+      try { body = JSON.parse(bodyStr); } catch { sendError(res, 400, 'Invalid JSON'); return; }
+
+      if (!body.secretName || !body.algorithm || !body.payload || !body.signature || !body.encoding) {
+        sendError(res, 400, 'secretName, algorithm, payload, signature, and encoding are required');
+        return;
+      }
+
+      const secretValue = await getSecret(body.secretName);
+      if (secretValue === null) {
+        sendError(res, 404, 'Secret not found');
+        return;
+      }
+
+      const computedHmac = createHmac(body.algorithm, secretValue)
+        .update(Buffer.from(body.payload, 'base64'))
+        .digest(body.encoding as 'hex' | 'base64');
+
+      let providedSignature = body.signature;
+      if (body.prefix && providedSignature.startsWith(body.prefix)) {
+        providedSignature = providedSignature.slice(body.prefix.length);
+      }
+
+      const computedBuf = Buffer.from(computedHmac, 'utf8');
+      const providedBuf = Buffer.from(providedSignature, 'utf8');
+      const valid = computedBuf.length === providedBuf.length &&
+        timingSafeEqual(computedBuf, providedBuf);
+
+      sendJson(res, 200, { valid });
+      return;
+    }
+
     // Not found
     sendError(res, 404, `Unknown endpoint: ${method} ${path}`);
   } catch (error) {
@@ -292,6 +337,7 @@ export function startHttpServer(options: ServerOptions): Promise<void> {
       console.log('  GET    /audit                       - Audit log [mgmt]');
       console.log('  POST   /proxy                       - Proxied HTTP request');
       console.log('  POST   /exec                        - Proxied command execution');
+      console.log('  POST   /validate-hmac                - Validate HMAC signature');
       console.log('');
       resolve();
     });
