@@ -136,11 +136,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
     };
   } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    const isConnectionError = msg.includes('fetch failed') || msg.includes('ECONNREFUSED');
+
+    if (isConnectionError && APP_URL) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: 'Credential Proxy is not responding. The macOS app may be locked — ask the user to click the key icon in the menu bar and enter their PIN to unlock it.',
+          },
+        ],
+        isError: true,
+      };
+    }
+
     return {
       content: [
         {
           type: 'text' as const,
-          text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+          text: `Error: ${msg}`,
         },
       ],
       isError: true,
