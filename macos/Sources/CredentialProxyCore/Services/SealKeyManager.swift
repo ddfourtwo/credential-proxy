@@ -35,6 +35,7 @@ public final class SealKeyManager {
 
     public var isUnlocked: Bool { cachedKey != nil }
     public var isFirstRun: Bool { !FileManager.default.fileExists(atPath: saltPath) }
+    public var daemonKeyExists: Bool { FileManager.default.fileExists(atPath: daemonKeyPath) }
 
     private init() {}
 

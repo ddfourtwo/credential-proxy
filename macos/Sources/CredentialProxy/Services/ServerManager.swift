@@ -8,10 +8,11 @@ final class ServerManager: ObservableObject {
 
     @Published var isRunning = false
     @Published var statusMessage = "Starting..."
+    @Published var isDaemonMode = false
 
     private var httpServer: HTTPServer?
     let port: UInt16
-    private let mgmtToken: String
+    private var mgmtToken: String
     private var healthCheckTimer: Timer?
 
     init(port: UInt16 = 11111) {
@@ -30,6 +31,21 @@ final class ServerManager: ObservableObject {
 
     func start() {
         NSLog("[ServerManager] start() called, port=\(port)")
+
+        // Check if daemon is already running on our port
+        if checkDaemonRunning() {
+            NSLog("[ServerManager] daemon detected on port \(port), entering management client mode")
+            isDaemonMode = true
+            loadDaemonMgmtToken()
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.isRunning = true
+                self.statusMessage = "Daemon mode (port \(self.port))"
+            }
+            startHealthChecks()
+            return
+        }
+
         let server = HTTPServer(port: port)
 
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -131,6 +147,40 @@ final class ServerManager: ObservableObject {
 
     func getToken() -> String {
         return mgmtToken
+    }
+
+    private func checkDaemonRunning() -> Bool {
+        let semaphore = DispatchSemaphore(value: 0)
+        var result = false
+
+        let url = URL(string: "http://127.0.0.1:\(port)/health")!
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 2.0
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            defer { semaphore.signal() }
+            guard error == nil,
+                  let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  json["status"] as? String == "ok" else { return }
+            result = true
+        }
+        task.resume()
+        _ = semaphore.wait(timeout: .now() + 3.0)
+        return result
+    }
+
+    private func loadDaemonMgmtToken() {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let tokenPath = appSupport.appendingPathComponent("credential-proxy/daemon.mgmt-token").path
+        if let tokenData = FileManager.default.contents(atPath: tokenPath),
+           let token = String(data: tokenData, encoding: .utf8) {
+            self.mgmtToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+            NSLog("[ServerManager] loaded daemon mgmt token from file")
+        } else {
+            NSLog("[ServerManager] warning: could not read daemon mgmt token")
+        }
     }
 
     private func startHealthChecks() {
