@@ -1,4 +1,5 @@
 import SwiftUI
+import CredentialProxyCore
 
 struct RequestCredentialView: View {
     let name: String

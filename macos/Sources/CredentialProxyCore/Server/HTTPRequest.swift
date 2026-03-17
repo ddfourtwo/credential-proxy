@@ -1,19 +1,28 @@
 import Foundation
 
-struct HTTPRequest {
-    var method: String
-    var path: String
-    var query: [String: String]
-    var headers: [String: String]  // lowercase keys for case-insensitive lookup
-    var body: Data?
-    var params: [String: String] = [:]
+public struct HTTPRequest {
+    public var method: String
+    public var path: String
+    public var query: [String: String]
+    public var headers: [String: String]  // lowercase keys for case-insensitive lookup
+    public var body: Data?
+    public var params: [String: String] = [:]
 
-    var bodyString: String? {
+    public init(method: String, path: String, query: [String: String], headers: [String: String], body: Data?, params: [String: String] = [:]) {
+        self.method = method
+        self.path = path
+        self.query = query
+        self.headers = headers
+        self.body = body
+        self.params = params
+    }
+
+    public var bodyString: String? {
         guard let body else { return nil }
         return String(data: body, encoding: .utf8)
     }
 
-    static func parse(from data: Data) -> HTTPRequest? {
+    public static func parse(from data: Data) -> HTTPRequest? {
         guard let headerEnd = findHeaderEnd(in: data) else { return nil }
 
         let headerData = data[data.startIndex..<headerEnd]
@@ -65,7 +74,7 @@ struct HTTPRequest {
     }
 
     /// Returns the byte offset of the start of \r\n\r\n in data, or nil if not found
-    static func findHeaderEnd(in data: Data) -> Int? {
+    public static func findHeaderEnd(in data: Data) -> Int? {
         let separator: [UInt8] = [0x0D, 0x0A, 0x0D, 0x0A]  // \r\n\r\n
         guard data.count >= 4 else { return nil }
         for i in 0...(data.count - 4) {
@@ -80,7 +89,7 @@ struct HTTPRequest {
     }
 
     /// Returns the total expected size of the request (headers + body), or nil if headers incomplete
-    static func expectedSize(of data: Data) -> Int? {
+    public static func expectedSize(of data: Data) -> Int? {
         guard let headerEnd = findHeaderEnd(in: data) else { return nil }
         let headerString = String(data: data[data.startIndex..<headerEnd], encoding: .utf8) ?? ""
         let lines = headerString.components(separatedBy: "\r\n")

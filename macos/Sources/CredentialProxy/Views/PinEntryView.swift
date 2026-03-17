@@ -1,4 +1,5 @@
 import SwiftUI
+import CredentialProxyCore
 
 struct PinEntryView: View {
     let seal = SealKeyManager.shared

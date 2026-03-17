@@ -8,8 +8,8 @@ import Foundation
 /// Previously used macOS Keychain, but per-application ACL restrictions
 /// caused password prompts on every binary rebuild. File-based storage
 /// avoids this entirely — security is provided by seal key encryption.
-final class KeychainManager {
-    static let shared = KeychainManager()
+public final class KeychainManager {
+    public static let shared = KeychainManager()
     private let service = "com.credential-proxy.secrets"
 
     private let secretsDir: String = {
@@ -24,14 +24,14 @@ final class KeychainManager {
         secretsDir + "/" + name + ".sealed"
     }
 
-    func store(name: String, value: String) throws {
+    public func store(name: String, value: String) throws {
         let encrypted = try SealKeyManager.shared.encrypt(value)
         let path = pathFor(name: name)
         try encrypted.write(to: URL(fileURLWithPath: path), options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
     }
 
-    func retrieve(name: String) throws -> String? {
+    public func retrieve(name: String) throws -> String? {
         let path = pathFor(name: name)
         guard FileManager.default.fileExists(atPath: path) else {
             return nil
@@ -40,14 +40,14 @@ final class KeychainManager {
         return try SealKeyManager.shared.decrypt(data)
     }
 
-    func delete(name: String) throws {
+    public func delete(name: String) throws {
         let path = pathFor(name: name)
         if FileManager.default.fileExists(atPath: path) {
             try FileManager.default.removeItem(atPath: path)
         }
     }
 
-    func list() throws -> [String] {
+    public func list() throws -> [String] {
         guard FileManager.default.fileExists(atPath: secretsDir) else { return [] }
         let files = try FileManager.default.contentsOfDirectory(atPath: secretsDir)
         return files
@@ -56,14 +56,14 @@ final class KeychainManager {
     }
 }
 
-enum KeychainError: LocalizedError {
+public enum KeychainError: LocalizedError {
     case encodingFailed
     case storeFailed(OSStatus)
     case retrieveFailed(OSStatus)
     case deleteFailed(OSStatus)
     case listFailed(OSStatus)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .encodingFailed: return "Failed to encode secret value"
         case .storeFailed(let s): return "Keychain store failed: \(s)"

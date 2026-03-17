@@ -1,4 +1,5 @@
 import SwiftUI
+import CredentialProxyCore
 
 struct MenuBarView: View {
     @EnvironmentObject var serverManager: ServerManager

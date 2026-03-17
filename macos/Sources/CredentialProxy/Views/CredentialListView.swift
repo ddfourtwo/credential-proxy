@@ -1,4 +1,5 @@
 import SwiftUI
+import CredentialProxyCore
 
 struct CredentialListView: View {
     @EnvironmentObject var apiClient: APIClient

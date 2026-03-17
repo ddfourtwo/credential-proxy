@@ -70,7 +70,7 @@ private func substituteSecrets(in content: String, secrets: [String: String]) ->
 
 // MARK: - Handler
 
-func handleProxyExec(
+public func handleProxyExec(
     _ input: ProxyExecInput,
     secretStore: SecretStore,
     auditLogger: AuditLogger

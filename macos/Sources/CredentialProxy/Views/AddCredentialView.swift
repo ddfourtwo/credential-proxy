@@ -1,4 +1,5 @@
 import SwiftUI
+import CredentialProxyCore
 
 struct AddCredentialView: View {
     let onComplete: () async -> Void

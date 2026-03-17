@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import CredentialProxyCore
 
 /// Manages credential request windows triggered by AI agents.
 /// The agent calls request_credential → HTTP endpoint → this manager opens a UI window

@@ -32,13 +32,14 @@ private struct RotateCredentialBody: Codable {
 
 // MARK: - Request Handler
 
-enum RequestHandler {
+public enum RequestHandler {
 
-    static func configureRoutes(
+    public static func configureRoutes(
         router: Router,
         secretStore: SecretStore,
         auditLogger: AuditLogger,
-        mgmtToken: String?
+        mgmtToken: String?,
+        requestCredentialHandler: (@Sendable (HTTPRequest) async -> HTTPResponse)? = nil
     ) {
         // MARK: Public Endpoints
 
@@ -128,39 +129,10 @@ enum RequestHandler {
         }
 
         router.route("POST", "/request-credential") { request in
-            guard let body = request.body, !body.isEmpty else {
-                return .error(400, "Request body is required")
+            guard let handler = requestCredentialHandler else {
+                return .error(501, "Not available in headless mode")
             }
-
-            let parsed: RequestCredentialBody
-            do {
-                parsed = try JSONDecoder().decode(RequestCredentialBody.self, from: body)
-            } catch {
-                return .error(400, "Invalid JSON")
-            }
-
-            guard let name = parsed.name, !name.isEmpty else {
-                return .error(400, "name is required")
-            }
-
-            guard let domains = parsed.resolvedDomains, !domains.isEmpty else {
-                return .error(400, "domains is required and must not be empty")
-            }
-
-            let placements = parsed.resolvedPlacements ?? ["header"]
-
-            let saved = await CredentialRequestManager.shared.requestCredential(
-                name: name.uppercased(),
-                domains: domains,
-                placements: placements,
-                commands: parsed.resolvedCommands
-            )
-
-            if saved {
-                return .json(200, ["success": AnyCodableValue.bool(true)])
-            } else {
-                return .json(200, ["cancelled": AnyCodableValue.bool(true)])
-            }
+            return await handler(request)
         }
 
         // MARK: Management Endpoints

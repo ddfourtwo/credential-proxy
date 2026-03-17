@@ -11,8 +11,8 @@ import CommonCrypto
 /// Files stored in data dir:
 ///   - seal.salt: random 32-byte salt (not secret — useless without PIN)
 ///   - seal.verify: encrypted known string to verify correct PIN
-final class SealKeyManager {
-    static let shared = SealKeyManager()
+public final class SealKeyManager {
+    public static let shared = SealKeyManager()
 
     private let dataDir: String = {
         let dir = NSHomeDirectory() + "/Library/Application Support/credential-proxy"
@@ -30,8 +30,8 @@ final class SealKeyManager {
     private(set) var cachedKey: SymmetricKey?
     private var cachedPin: String?
 
-    var isUnlocked: Bool { cachedKey != nil }
-    var isFirstRun: Bool { !FileManager.default.fileExists(atPath: saltPath) }
+    public var isUnlocked: Bool { cachedKey != nil }
+    public var isFirstRun: Bool { !FileManager.default.fileExists(atPath: saltPath) }
 
     private init() {}
 
@@ -41,7 +41,7 @@ final class SealKeyManager {
     /// Generates salt, derives key, stores salt + verification blob.
     /// Throws `saltAlreadyExists` if called when seal data already exists — prevents
     /// accidental overwrite of the salt which would make all stored secrets undecryptable.
-    func setup(pin: String) throws {
+    public func setup(pin: String) throws {
         guard isFirstRun else {
             throw SealKeyError.saltAlreadyExists
         }
@@ -66,7 +66,7 @@ final class SealKeyManager {
     // MARK: - Unlock (subsequent launches)
 
     /// Unlock with a PIN. Returns true if PIN is correct.
-    func unlock(pin: String) throws -> Bool {
+    public func unlock(pin: String) throws -> Bool {
         if cachedKey != nil { return true }
 
         guard let salt = try? Data(contentsOf: URL(fileURLWithPath: saltPath)),
@@ -90,7 +90,7 @@ final class SealKeyManager {
     // MARK: - Reset
 
     /// Delete seal data and all stored secrets.
-    func reset() {
+    public func reset() {
         try? FileManager.default.removeItem(atPath: saltPath)
         try? FileManager.default.removeItem(atPath: verifyPath)
         try? FileManager.default.removeItem(atPath: migrationPath)
@@ -107,13 +107,13 @@ final class SealKeyManager {
 
     // MARK: - Update Migration
 
-    var hasPendingMigration: Bool {
+    public var hasPendingMigration: Bool {
         FileManager.default.fileExists(atPath: migrationPath)
     }
 
     /// Prepare for binary update: re-encrypt all secrets with a migration key
     /// (PIN + salt, no binary hash) so the new binary can decrypt them.
-    func prepareForUpdate() throws {
+    public func prepareForUpdate() throws {
         guard let key = cachedKey else { throw SealKeyError.notUnlocked }
         guard let salt = try? Data(contentsOf: URL(fileURLWithPath: saltPath)) else {
             throw SealKeyError.noSealData
@@ -151,7 +151,7 @@ final class SealKeyManager {
     }
 
     /// After binary update: unlock with PIN using migration key, re-encrypt secrets with new binary-bound key.
-    func completeMigration(pin: String) throws -> Bool {
+    public func completeMigration(pin: String) throws -> Bool {
         guard let salt = try? Data(contentsOf: URL(fileURLWithPath: saltPath)),
               let blobData = try? Data(contentsOf: URL(fileURLWithPath: migrationPath)) else {
             return false
@@ -274,14 +274,14 @@ final class SealKeyManager {
 
     // MARK: - Encrypt / Decrypt Secrets
 
-    func encrypt(_ plaintext: String) throws -> Data {
+    public func encrypt(_ plaintext: String) throws -> Data {
         guard let key = cachedKey else {
             throw SealKeyError.notUnlocked
         }
         return try encrypt(plaintext, key: key)
     }
 
-    func decrypt(_ ciphertext: Data) throws -> String {
+    public func decrypt(_ ciphertext: Data) throws -> String {
         guard let key = cachedKey else {
             throw SealKeyError.notUnlocked
         }
@@ -319,7 +319,7 @@ private struct MigrationSecret: Codable {
     let data: Data
 }
 
-enum SealKeyError: LocalizedError {
+public enum SealKeyError: LocalizedError {
     case notUnlocked
     case encryptionFailed
     case decryptionFailed
@@ -328,7 +328,7 @@ enum SealKeyError: LocalizedError {
     case binaryHashFailed
     case saltAlreadyExists
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .notUnlocked: return "Seal key not unlocked — PIN required"
         case .encryptionFailed: return "Failed to encrypt secret"

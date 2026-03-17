@@ -1,13 +1,13 @@
 import Foundation
 import Network
 
-class HTTPServer {
+public class HTTPServer {
     private let port: UInt16
     private let host: String
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "HTTPServer", attributes: .concurrent)
 
-    var router: Router?
+    public var router: Router?
 
     private static let maxBodySize = 1024 * 1024  // 1 MB
 
@@ -17,12 +17,12 @@ class HTTPServer {
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
     ]
 
-    init(port: UInt16, host: String = "127.0.0.1") {
+    public init(port: UInt16, host: String = "127.0.0.1") {
         self.port = port
         self.host = host
     }
 
-    func start(router: Router) throws {
+    public func start(router: Router) throws {
         self.router = router
 
         let params = NWParameters.tcp
@@ -54,7 +54,7 @@ class HTTPServer {
         self.listener = listener
     }
 
-    func stop() {
+    public func stop() {
         listener?.cancel()
         listener = nil
     }
@@ -164,6 +164,6 @@ class HTTPServer {
     }
 }
 
-enum ServerError: Error {
+public enum ServerError: Error {
     case invalidPort
 }

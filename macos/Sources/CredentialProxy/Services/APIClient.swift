@@ -1,4 +1,5 @@
 import Foundation
+import CredentialProxyCore
 
 @MainActor
 final class APIClient: ObservableObject {

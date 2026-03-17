@@ -1,10 +1,10 @@
 import Foundation
 
-struct HTTPResponse {
-    var status: Int
-    var statusText: String
-    var headers: [String: String]
-    var body: Data?
+public struct HTTPResponse {
+    public var status: Int
+    public var statusText: String
+    public var headers: [String: String]
+    public var body: Data?
 
     private static let statusTexts: [Int: String] = [
         200: "OK",
@@ -19,14 +19,14 @@ struct HTTPResponse {
         500: "Internal Server Error",
     ]
 
-    init(status: Int, statusText: String? = nil, headers: [String: String] = [:], body: Data? = nil) {
+    public init(status: Int, statusText: String? = nil, headers: [String: String] = [:], body: Data? = nil) {
         self.status = status
         self.statusText = statusText ?? Self.statusTexts[status] ?? "Unknown"
         self.headers = headers
         self.body = body
     }
 
-    static func json(_ status: Int, _ value: some Encodable) -> HTTPResponse {
+    public static func json(_ status: Int, _ value: some Encodable) -> HTTPResponse {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(value) else {
@@ -39,15 +39,15 @@ struct HTTPResponse {
         )
     }
 
-    static func error(_ status: Int, _ message: String) -> HTTPResponse {
+    public static func error(_ status: Int, _ message: String) -> HTTPResponse {
         return json(status, ["error": message])
     }
 
-    static func ok(_ value: some Encodable) -> HTTPResponse {
+    public static func ok(_ value: some Encodable) -> HTTPResponse {
         return json(200, value)
     }
 
-    func serialize() -> Data {
+    public func serialize() -> Data {
         var result = "HTTP/1.1 \(status) \(statusText)\r\n"
 
         var allHeaders = headers

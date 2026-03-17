@@ -1,15 +1,21 @@
 import Foundation
 
-struct RedactionResult {
-    let content: String
-    let redacted: Bool
-    let redactedSecrets: [String]
+public struct RedactionResult {
+    public let content: String
+    public let redacted: Bool
+    public let redactedSecrets: [String]
+
+    public init(content: String, redacted: Bool, redactedSecrets: [String]) {
+        self.content = content
+        self.redacted = redacted
+        self.redactedSecrets = redactedSecrets
+    }
 }
 
-enum RedactionService {
+public enum RedactionService {
     /// Replace secret values in content with `[REDACTED:SECRET_NAME]`.
     /// Skips secrets shorter than 6 characters to avoid false positives.
-    static func redactSecrets(
+    public static func redactSecrets(
         in content: String,
         secrets: [(name: String, value: String)]
     ) -> RedactionResult {

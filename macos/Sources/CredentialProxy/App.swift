@@ -1,4 +1,5 @@
 import SwiftUI
+import CredentialProxyCore
 
 struct CredentialProxyApp: App {
     @ObservedObject private var serverManager = ServerManager.shared

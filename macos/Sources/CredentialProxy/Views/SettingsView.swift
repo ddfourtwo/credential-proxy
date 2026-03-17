@@ -1,4 +1,5 @@
 import SwiftUI
+import CredentialProxyCore
 
 struct SettingsView: View {
     @EnvironmentObject var serverManager: ServerManager

@@ -1,8 +1,8 @@
 import Foundation
 
-typealias RouteHandler = (HTTPRequest) async throws -> HTTPResponse
+public typealias RouteHandler = (HTTPRequest) async throws -> HTTPResponse
 
-class Router {
+public class Router {
     private struct Route {
         let method: String
         let pattern: String
@@ -12,12 +12,14 @@ class Router {
 
     private var routes: [Route] = []
 
-    func route(_ method: String, _ pattern: String, _ handler: @escaping RouteHandler) {
+    public init() {}
+
+    public func route(_ method: String, _ pattern: String, _ handler: @escaping RouteHandler) {
         let segments = pattern.split(separator: "/").map(String.init)
         routes.append(Route(method: method.uppercased(), pattern: pattern, segments: segments, handler: handler))
     }
 
-    func handle(_ request: HTTPRequest) async -> HTTPResponse {
+    public func handle(_ request: HTTPRequest) async -> HTTPResponse {
         var pathMatched = false
         let requestSegments = request.path.split(separator: "/").map(String.init)
 

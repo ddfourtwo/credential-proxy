@@ -5,7 +5,7 @@ import FoundationNetworking
 #endif
 
 /// Handles HTTP proxy requests with credential substitution.
-enum ProxyRequestHandler {
+public enum ProxyRequestHandler {
 
     // MARK: - Placeholder Detection
 
@@ -152,7 +152,7 @@ enum ProxyRequestHandler {
 
     // MARK: - Public API
 
-    static func handleProxyRequest(
+    public static func handleProxyRequest(
         _ input: ProxyRequestInput,
         secretStore: SecretStore,
         auditLogger: AuditLogger

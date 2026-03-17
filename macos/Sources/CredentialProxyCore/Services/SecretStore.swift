@@ -1,8 +1,8 @@
 import Foundation
 
 /// Manages secret metadata (JSON file) and secret values (Keychain).
-actor SecretStore {
-    static let shared = SecretStore()
+public actor SecretStore {
+    public static let shared = SecretStore()
 
     private let keychain = KeychainManager.shared
     private let secretsFilePath: URL
@@ -20,7 +20,7 @@ actor SecretStore {
 
     // MARK: - Store Operations
 
-    func loadStore() throws -> SecretsStore {
+    public func loadStore() throws -> SecretsStore {
         guard FileManager.default.fileExists(atPath: secretsFilePath.path) else {
             return SecretsStore(version: CURRENT_VERSION, secrets: [:])
         }
@@ -35,7 +35,7 @@ actor SecretStore {
         return store
     }
 
-    func saveStore(_ store: SecretsStore) throws {
+    public func saveStore(_ store: SecretsStore) throws {
         let dir = secretsFilePath.deletingLastPathComponent()
         if !FileManager.default.fileExists(atPath: dir.path) {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [
@@ -50,7 +50,7 @@ actor SecretStore {
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: secretsFilePath.path)
     }
 
-    func migrateV1ToV2(_ store: SecretsStore) throws -> SecretsStore {
+    public func migrateV1ToV2(_ store: SecretsStore) throws -> SecretsStore {
         // Re-decode secrets as legacy format
         let data = try JSONEncoder().encode(store)
         let raw = try JSONSerialization.jsonObject(with: data) as! [String: Any]
@@ -85,7 +85,7 @@ actor SecretStore {
 
     // MARK: - CRUD Operations
 
-    func addSecret(
+    public func addSecret(
         name: String,
         value: String,
         allowedDomains: [String],
@@ -114,7 +114,7 @@ actor SecretStore {
         return (created: true, overwritten: overwritten)
     }
 
-    func getSecret(name: String) throws -> String? {
+    public func getSecret(name: String) throws -> String? {
         let store = try loadStore()
         guard store.secrets[name] != nil else {
             return nil
@@ -122,12 +122,12 @@ actor SecretStore {
         return try keychain.retrieve(name: name)
     }
 
-    func getSecretMetadata(name: String) throws -> SecretMetadata? {
+    public func getSecretMetadata(name: String) throws -> SecretMetadata? {
         let store = try loadStore()
         return store.secrets[name]
     }
 
-    func listSecrets() throws -> [SecretInfo] {
+    public func listSecrets() throws -> [SecretInfo] {
         let store = try loadStore()
 
         return store.secrets.map { name, meta in
@@ -155,7 +155,7 @@ actor SecretStore {
         }
     }
 
-    func removeSecret(name: String) throws -> Bool {
+    public func removeSecret(name: String) throws -> Bool {
         var store = try loadStore()
 
         guard store.secrets[name] != nil else {
@@ -168,7 +168,7 @@ actor SecretStore {
         return true
     }
 
-    func rotateSecret(name: String, newValue: String) throws -> Int? {
+    public func rotateSecret(name: String, newValue: String) throws -> Int? {
         var store = try loadStore()
         guard let secret = store.secrets[name] else {
             return nil
@@ -196,7 +196,7 @@ actor SecretStore {
         return previousUsageCount
     }
 
-    func recordUsage(name: String) throws {
+    public func recordUsage(name: String) throws {
         var store = try loadStore()
         guard let secret = store.secrets[name] else {
             return
@@ -215,7 +215,7 @@ actor SecretStore {
         try saveStore(store)
     }
 
-    func secretExists(name: String) throws -> Bool {
+    public func secretExists(name: String) throws -> Bool {
         let store = try loadStore()
         return store.secrets[name] != nil
     }
@@ -245,13 +245,13 @@ actor SecretStore {
 
 // MARK: - Errors
 
-enum SecretStoreError: LocalizedError {
+public enum SecretStoreError: LocalizedError {
     case invalidName(String)
     case noDomainsProvided
     case invalidDomain(String)
     case cannotRotate1Password
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .invalidName(let name):
             return "Invalid secret name \"\(name)\". Must be SCREAMING_SNAKE_CASE (e.g., API_KEY, GITHUB_TOKEN)"

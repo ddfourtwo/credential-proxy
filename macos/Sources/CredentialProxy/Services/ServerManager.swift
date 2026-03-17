@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Security
+import CredentialProxyCore
 
 final class ServerManager: ObservableObject {
     static let shared = ServerManager()
@@ -43,7 +44,55 @@ final class ServerManager: ObservableObject {
             router: router,
             secretStore: secretStore,
             auditLogger: auditLogger,
-            mgmtToken: mgmtToken
+            mgmtToken: mgmtToken,
+            requestCredentialHandler: { request in
+                guard let body = request.body, !body.isEmpty else {
+                    return .error(400, "Request body is required")
+                }
+
+                struct RequestCredentialBody: Codable {
+                    let name: String?
+                    let domains: [String]?
+                    let placements: [String]?
+                    let commands: [String]?
+                    let allowedDomains: [String]?
+                    let allowedPlacements: [String]?
+                    let allowedCommands: [String]?
+                    var resolvedDomains: [String]? { domains ?? allowedDomains }
+                    var resolvedPlacements: [String]? { placements ?? allowedPlacements }
+                    var resolvedCommands: [String]? { commands ?? allowedCommands }
+                }
+
+                let parsed: RequestCredentialBody
+                do {
+                    parsed = try JSONDecoder().decode(RequestCredentialBody.self, from: body)
+                } catch {
+                    return .error(400, "Invalid JSON")
+                }
+
+                guard let name = parsed.name, !name.isEmpty else {
+                    return .error(400, "name is required")
+                }
+
+                guard let domains = parsed.resolvedDomains, !domains.isEmpty else {
+                    return .error(400, "domains is required and must not be empty")
+                }
+
+                let placements = parsed.resolvedPlacements ?? ["header"]
+
+                let saved = await CredentialRequestManager.shared.requestCredential(
+                    name: name.uppercased(),
+                    domains: domains,
+                    placements: placements,
+                    commands: parsed.resolvedCommands
+                )
+
+                if saved {
+                    return .json(200, ["success": AnyCodableValue.bool(true)])
+                } else {
+                    return .json(200, ["cancelled": AnyCodableValue.bool(true)])
+                }
+            }
         )
 
         do {

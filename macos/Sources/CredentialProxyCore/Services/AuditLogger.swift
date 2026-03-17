@@ -1,6 +1,6 @@
 import Foundation
 
-enum AuditEventType: String, Codable {
+public enum AuditEventType: String, Codable {
     case SECRET_USED
     case SECRET_USED_EXEC
     case SECRET_BLOCKED
@@ -10,44 +10,78 @@ enum AuditEventType: String, Codable {
     case SECRET_ROTATED
 }
 
-struct AuditEvent: Codable {
-    let type: AuditEventType
-    let timestamp: String
-    let secret: String
+public struct AuditEvent: Codable {
+    public let type: AuditEventType
+    public let timestamp: String
+    public let secret: String
 
     // SECRET_USED / SECRET_BLOCKED
-    var domain: String?
+    public var domain: String?
     // SECRET_USED
-    var method: String?
-    var status: Int?
+    public var method: String?
+    public var status: Int?
     // SECRET_USED / SECRET_USED_EXEC
-    var durationMs: Int?
+    public var durationMs: Int?
     // SECRET_USED_EXEC
-    var command: String?
-    var exitCode: Int?
+    public var command: String?
+    public var exitCode: Int?
     // SECRET_BLOCKED
-    var reason: String?
+    public var reason: String?
     // SECRET_REDACTED
-    var responseBytes: Int?
-    var redactedCount: Int?
+    public var responseBytes: Int?
+    public var redactedCount: Int?
     // SECRET_ADDED
-    var domains: [String]?
-    var placements: [String]?
+    public var domains: [String]?
+    public var placements: [String]?
     // SECRET_ROTATED
-    var previousUses: Int?
+    public var previousUses: Int?
+
+    public init(
+        type: AuditEventType,
+        timestamp: String,
+        secret: String,
+        domain: String? = nil,
+        method: String? = nil,
+        status: Int? = nil,
+        durationMs: Int? = nil,
+        command: String? = nil,
+        exitCode: Int? = nil,
+        reason: String? = nil,
+        responseBytes: Int? = nil,
+        redactedCount: Int? = nil,
+        domains: [String]? = nil,
+        placements: [String]? = nil,
+        previousUses: Int? = nil
+    ) {
+        self.type = type
+        self.timestamp = timestamp
+        self.secret = secret
+        self.domain = domain
+        self.method = method
+        self.status = status
+        self.durationMs = durationMs
+        self.command = command
+        self.exitCode = exitCode
+        self.reason = reason
+        self.responseBytes = responseBytes
+        self.redactedCount = redactedCount
+        self.domains = domains
+        self.placements = placements
+        self.previousUses = previousUses
+    }
 }
 
-class AuditLogger {
+public class AuditLogger {
     private static let maxLogSize = 10 * 1024 * 1024 // 10MB
 
-    private(set) var logFilePath: String
+    public private(set) var logFilePath: String
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         return encoder
     }()
 
-    init(logFilePath: String? = nil) {
+    public init(logFilePath: String? = nil) {
         if let logFilePath {
             self.logFilePath = logFilePath
         } else {
@@ -58,7 +92,7 @@ class AuditLogger {
         }
     }
 
-    func log(_ event: AuditEvent) {
+    public func log(_ event: AuditEvent) {
         ensureLogDir()
         rotateIfNeeded()
 
