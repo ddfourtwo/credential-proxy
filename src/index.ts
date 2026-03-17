@@ -38,13 +38,30 @@ async function relayToApp(
     opts.body = JSON.stringify(body);
   }
 
-  const res = await fetch(url.toString(), opts);
-  const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(`App server returned ${res.status}: ${text.slice(0, 200)}`);
+  const maxRetries = 3;
+  const baseDelay = 500; // ms
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url.toString(), opts);
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error(`App server returned ${res.status}: ${text.slice(0, 200)}`);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const isConnectionError = msg.includes('fetch failed') || msg.includes('ECONNREFUSED');
+      if (!isConnectionError || attempt === maxRetries) {
+        throw error;
+      }
+      // Server may be starting up after unlock — wait and retry
+      await new Promise(resolve => setTimeout(resolve, baseDelay * (attempt + 1)));
+    }
   }
+
+  throw new Error('Unreachable');
 }
 
 const server = new Server(
@@ -144,7 +161,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         content: [
           {
             type: 'text' as const,
-            text: 'Credential Proxy is not responding. The macOS app may be locked — ask the user to click the key icon in the menu bar and enter their PIN to unlock it.',
+            text: `Credential Proxy is not responding at ${APP_URL} (retried 3 times). Possible causes:\n` +
+              '1. The macOS app is locked — click the key icon in the menu bar and enter your PIN\n' +
+              '2. The app was just unlocked — the server may still be starting, try again in a few seconds\n' +
+              '3. The app is not running — launch Credential Proxy from Applications',
           },
         ],
         isError: true,
