@@ -74,34 +74,61 @@ export const installCommand = new Command('install')
       execSync('npm ci --omit=dev', { cwd: INSTALL_DIR, stdio: 'inherit' });
       console.log(colors.green('✓ Production dependencies installed'));
 
-      // Step 4: Register in ~/.claude.json
-      let claudeConfig: Record<string, unknown> = {};
-      if (existsSync(CLAUDE_JSON)) {
-        const content = await readFile(CLAUDE_JSON, 'utf8');
-        claudeConfig = JSON.parse(content);
-      }
+      // Step 4: Register MCP server
+      // Prefer ctmux-mcp registry if available, fall back to direct ~/.claude.json write
+      let hasCtmuxMcp = false;
+      try {
+        execSync('command -v ctmux-mcp', { stdio: 'pipe' });
+        hasCtmuxMcp = true;
+      } catch {}
 
-      const mcpServers = (claudeConfig.mcpServers ?? {}) as Record<string, unknown>;
-      const mcpEntry: Record<string, unknown> = {
-        type: 'stdio',
-        command: 'node',
-        args: [join(INSTALL_DIR, 'index.js')]
-      };
-
-      // If the macOS app is installed, set relay mode so the MCP server
-      // forwards tool calls to the app's HTTP server (which holds the secrets).
-      const appPath = join(homedir(), 'Applications', 'Credential Proxy.app');
-      if (existsSync(appPath)) {
-        mcpEntry.env = {
-          CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111'
+      if (hasCtmuxMcp) {
+        const appRelayPath = join(homedir(), 'Applications', 'Credential Proxy.app', 'Contents', 'Resources', 'mcp-relay', 'index.js');
+        const registryConfig = {
+          command: 'node',
+          args: [join(INSTALL_DIR, 'index.js')],
+          env: { CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111' },
+          backendOverrides: {
+            'claude-code': { type: 'stdio' },
+            'pi': {
+              lifecycle: 'keep-alive',
+              directTools: true,
+              args: [appRelayPath]
+            }
+          }
         };
+        execSync(`ctmux-mcp register credential-proxy '${JSON.stringify(registryConfig)}'`, { stdio: 'inherit' });
+        execSync('ctmux-mcp sync', { stdio: 'inherit' });
+        console.log(colors.green('✓ Registered credential-proxy in MCP registry'));
+      } else {
+        let claudeConfig: Record<string, unknown> = {};
+        if (existsSync(CLAUDE_JSON)) {
+          const content = await readFile(CLAUDE_JSON, 'utf8');
+          claudeConfig = JSON.parse(content);
+        }
+
+        const mcpServers = (claudeConfig.mcpServers ?? {}) as Record<string, unknown>;
+        const mcpEntry: Record<string, unknown> = {
+          type: 'stdio',
+          command: 'node',
+          args: [join(INSTALL_DIR, 'index.js')]
+        };
+
+        // If the macOS app is installed, set relay mode so the MCP server
+        // forwards tool calls to the app's HTTP server (which holds the secrets).
+        const appPath = join(homedir(), 'Applications', 'Credential Proxy.app');
+        if (existsSync(appPath)) {
+          mcpEntry.env = {
+            CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111'
+          };
+        }
+
+        mcpServers['credential-proxy'] = mcpEntry;
+        claudeConfig.mcpServers = mcpServers;
+
+        await writeFile(CLAUDE_JSON, JSON.stringify(claudeConfig, null, 2));
+        console.log(colors.green(`✓ Updated ${CLAUDE_JSON}`));
       }
-
-      mcpServers['credential-proxy'] = mcpEntry;
-      claudeConfig.mcpServers = mcpServers;
-
-      await writeFile(CLAUDE_JSON, JSON.stringify(claudeConfig, null, 2));
-      console.log(colors.green(`✓ Updated ${CLAUDE_JSON}`));
 
       // Step 5: Symlink CLI to ~/.local/bin/credential-proxy
       await mkdir(BIN_DIR, { recursive: true });

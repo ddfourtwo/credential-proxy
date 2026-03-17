@@ -105,40 +105,60 @@ info "Configuring Claude Code MCP server..."
 # The stdio server never accesses secrets directly.
 MCP_INDEX="$MCP_RELAY_DIR/index.js"
 
-if [ -f "$CLAUDE_JSON" ]; then
-    node -e "
-        const fs = require('fs');
-        const config = JSON.parse(fs.readFileSync('$CLAUDE_JSON', 'utf8'));
-        config.mcpServers = config.mcpServers || {};
-        config.mcpServers['credential-proxy'] = {
-            type: 'stdio',
-            command: 'node',
-            args: ['$MCP_INDEX'],
-            env: {
-                CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111'
+if command -v ctmux-mcp >/dev/null 2>&1; then
+    # Use ctmux-mcp registry for multi-backend support
+    ctmux-mcp register credential-proxy "{
+        \"command\": \"node\",
+        \"args\": [\"$MCP_RELAY_DIR/index.js\"],
+        \"env\": {\"CREDENTIAL_PROXY_APP_URL\": \"http://127.0.0.1:11111\"},
+        \"backendOverrides\": {
+            \"claude-code\": {\"type\": \"stdio\"},
+            \"pi\": {
+                \"lifecycle\": \"keep-alive\",
+                \"directTools\": true,
+                \"args\": [\"$MCP_RELAY_DIR/index.js\"]
             }
-        };
-        fs.writeFileSync('$CLAUDE_JSON', JSON.stringify(config, null, 2));
-    "
+        }
+    }"
+    ctmux-mcp sync
+    success "Registered credential-proxy in MCP registry"
 else
-    node -e "
-        const fs = require('fs');
-        const config = {
-            mcpServers: {
-                'credential-proxy': {
-                    type: 'stdio',
-                    command: 'node',
-                    args: ['$MCP_INDEX'],
-                    env: {
-                        CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111'
+    # Fallback: direct ~/.claude.json write
+    if [ -f "$CLAUDE_JSON" ]; then
+        node -e "
+            const fs = require('fs');
+            const config = JSON.parse(fs.readFileSync('$CLAUDE_JSON', 'utf8'));
+            config.mcpServers = config.mcpServers || {};
+            config.mcpServers['credential-proxy'] = {
+                type: 'stdio',
+                command: 'node',
+                args: ['$MCP_INDEX'],
+                env: {
+                    CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111'
+                }
+            };
+            fs.writeFileSync('$CLAUDE_JSON', JSON.stringify(config, null, 2));
+        "
+    else
+        node -e "
+            const fs = require('fs');
+            const config = {
+                mcpServers: {
+                    'credential-proxy': {
+                        type: 'stdio',
+                        command: 'node',
+                        args: ['$MCP_INDEX'],
+                        env: {
+                            CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111'
+                        }
                     }
                 }
-            }
-        };
-        fs.writeFileSync('$CLAUDE_JSON', JSON.stringify(config, null, 2));
-    "
+            };
+            fs.writeFileSync('$CLAUDE_JSON', JSON.stringify(config, null, 2));
+        "
+    fi
+    success "Claude Code MCP relay configured (stdio → native HTTP server)"
 fi
-success "Claude Code MCP relay configured (stdio → native HTTP server)"
 
 # --- Step 5: Migrate existing secrets to Keychain ---
 
