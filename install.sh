@@ -25,8 +25,6 @@ error() { echo -e "${RED}✗ $1${RESET}"; exit 1; }
 
 command -v node >/dev/null 2>&1 || error "Node.js is required. Install it from https://nodejs.org"
 command -v npm >/dev/null 2>&1 || error "npm is required"
-command -v swift >/dev/null 2>&1 || error "Swift is required. Install Xcode Command Line Tools: xcode-select --install"
-
 NODE_VERSION=$(node -v | sed 's/v//' | cut -d. -f1)
 if [ "$NODE_VERSION" -lt 20 ]; then
     error "Node.js 20+ is required (found v$(node -v))"
@@ -47,13 +45,13 @@ fi
 npm run build --silent 2>/dev/null
 success "MCP relay built"
 
-# --- Step 2: Build Swift macOS app ---
+# --- Step 2: Locate pre-built macOS binary ---
 
-info "Building macOS app (native HTTP server)..."
-cd "$SCRIPT_DIR/macos"
-swift build -c release --quiet 2>/dev/null
-SWIFT_BIN_DIR="$(swift build -c release --show-bin-path)"
-success "macOS app built"
+PREBUILT_BIN="$SCRIPT_DIR/macos/bin/CredentialProxy"
+if [ ! -f "$PREBUILT_BIN" ]; then
+    error "Pre-built binary not found at $PREBUILT_BIN. Run 'cd macos && swift build -c release' and copy the binary to macos/bin/ first."
+fi
+success "Pre-built macOS binary found"
 
 # --- Step 3: Create .app bundle ---
 
@@ -73,7 +71,7 @@ mkdir -p "$APP_PATH/Contents/Resources"
 mkdir -p "$MCP_RELAY_DIR"
 
 # Copy app binary (includes native HTTP server — no Node.js server needed)
-cp "$SWIFT_BIN_DIR/CredentialProxy" "$APP_PATH/Contents/MacOS/CredentialProxy"
+cp "$PREBUILT_BIN" "$APP_PATH/Contents/MacOS/CredentialProxy"
 
 # Copy Info.plist
 cp "$SCRIPT_DIR/macos/Info.plist" "$APP_PATH/Contents/Info.plist"

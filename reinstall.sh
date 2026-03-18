@@ -43,20 +43,18 @@ info "Installing MCP server..."
 node dist/cli/index.js install
 success "MCP server installed"
 
-# --- Build macOS app ---
-
-info "Building macOS app..."
-cd "$SCRIPT_DIR/macos"
-swift build -c release --quiet 2>/dev/null
-success "macOS app built"
-
 # --- Replace binary and relaunch ---
+
+PREBUILT_BIN="$SCRIPT_DIR/macos/bin/CredentialProxy"
+if [ ! -f "$PREBUILT_BIN" ]; then
+    error "Pre-built binary not found at $PREBUILT_BIN. Run 'cd macos && swift build -c release' and copy the binary to macos/bin/ first."
+fi
 
 info "Stopping app..."
 pkill -x CredentialProxy || true
 sleep 1
 
-cp .build/release/CredentialProxy "$APP_PATH/Contents/MacOS/CredentialProxy"
+cp "$PREBUILT_BIN" "$APP_PATH/Contents/MacOS/CredentialProxy"
 success "Binary replaced"
 
 info "Relaunching app..."
