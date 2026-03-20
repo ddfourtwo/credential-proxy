@@ -8,7 +8,9 @@ import { listCredentialsTool, handleListCredentials } from './tools/list-credent
 import { proxyRequestTool, handleProxyRequest } from './tools/proxy-request.js';
 import { proxyExecTool, handleProxyExec } from './tools/proxy-exec.js';
 import { requestCredentialTool } from './tools/request-credential.js';
+import { updateCredentialTool, handleUpdateCredential } from './tools/update-credential.js';
 import type { RequestCredentialInput } from './tools/request-credential.js';
+import type { UpdateCredentialInput } from './tools/update-credential.js';
 import type { ListCredentialsInput } from './tools/list-credentials.js';
 import type { ProxyRequestInput } from './tools/proxy-request.js';
 import type { ProxyExecInput } from './tools/proxy-exec.js';
@@ -79,7 +81,7 @@ const server = new Server(
 // List available tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
-    tools: [listCredentialsTool, proxyRequestTool, proxyExecTool, requestCredentialTool],
+    tools: [listCredentialsTool, proxyRequestTool, proxyExecTool, requestCredentialTool, updateCredentialTool],
   };
 });
 
@@ -104,6 +106,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           break;
         case 'proxy_exec':
           result = await relayToApp('/exec', 'POST', args);
+          break;
+        case 'update_credential':
+          result = await relayToApp('/update-credential', 'POST', args);
           break;
         case 'request_credential': {
           const reqArgs = args as unknown as RequestCredentialInput;
@@ -135,6 +140,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           break;
         case 'proxy_exec':
           result = await handleProxyExec(args as unknown as ProxyExecInput);
+          break;
+        case 'update_credential':
+          result = await handleUpdateCredential(args as unknown as UpdateCredentialInput);
           break;
         case 'request_credential':
           return {

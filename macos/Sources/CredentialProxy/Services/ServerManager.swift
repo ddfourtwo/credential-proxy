@@ -108,6 +108,56 @@ final class ServerManager: ObservableObject {
                 } else {
                     return .json(200, ["cancelled": AnyCodableValue.bool(true)])
                 }
+            },
+            updateCredentialHandler: { request in
+                guard let body = request.body, !body.isEmpty else {
+                    return .error(400, "Request body is required")
+                }
+
+                struct UpdateCredentialBody: Codable {
+                    let name: String?
+                    let domains: [String]?
+                    let placements: [String]?
+                    let commands: [String]?
+                    let allowedDomains: [String]?
+                    let allowedPlacements: [String]?
+                    let allowedCommands: [String]?
+                    var resolvedDomains: [String]? { domains ?? allowedDomains }
+                    var resolvedPlacements: [String]? { placements ?? allowedPlacements }
+                    var resolvedCommands: [String]? { commands ?? allowedCommands }
+                }
+
+                let parsed: UpdateCredentialBody
+                do {
+                    parsed = try JSONDecoder().decode(UpdateCredentialBody.self, from: body)
+                } catch {
+                    return .error(400, "Invalid JSON")
+                }
+
+                guard let name = parsed.name, !name.isEmpty else {
+                    return .error(400, "name is required")
+                }
+
+                // Look up current metadata
+                guard let meta = try? await secretStore.getSecretMetadata(name: name) else {
+                    return .error(404, "Credential '\(name)' not found")
+                }
+
+                let approved = await CredentialRequestManager.shared.updateCredential(
+                    name: name,
+                    currentDomains: meta.allowedDomains,
+                    currentPlacements: meta.allowedPlacements.map(\.rawValue),
+                    currentCommands: meta.allowedCommands,
+                    proposedDomains: parsed.resolvedDomains,
+                    proposedPlacements: parsed.resolvedPlacements,
+                    proposedCommands: parsed.resolvedCommands
+                )
+
+                if approved {
+                    return .json(200, ["success": AnyCodableValue.bool(true)])
+                } else {
+                    return .json(200, ["denied": AnyCodableValue.bool(true)])
+                }
             }
         )
 

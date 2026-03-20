@@ -155,6 +155,35 @@ public actor SecretStore {
         }
     }
 
+    public func updateSecretMetadata(
+        name: String,
+        allowedDomains: [String]?,
+        allowedPlacements: [SecretPlacement]?,
+        allowedCommands: [String]??
+    ) throws -> Bool {
+        var store = try loadStore()
+        guard let secret = store.secrets[name] else {
+            return false
+        }
+
+        if let domains = allowedDomains {
+            try validateDomains(domains)
+        }
+
+        store.secrets[name] = SecretMetadata(
+            source: secret.source,
+            allowedDomains: allowedDomains ?? secret.allowedDomains,
+            allowedPlacements: allowedPlacements ?? secret.allowedPlacements,
+            allowedCommands: allowedCommands ?? secret.allowedCommands,
+            createdAt: secret.createdAt,
+            lastUsed: secret.lastUsed,
+            usageCount: secret.usageCount
+        )
+
+        try saveStore(store)
+        return true
+    }
+
     public func removeSecret(name: String) throws -> Bool {
         var store = try loadStore()
 

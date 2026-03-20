@@ -224,6 +224,36 @@ export async function listSecrets(): Promise<SecretInfo[]> {
   }));
 }
 
+export async function updateSecretMetadata(
+  name: string,
+  updates: {
+    allowedDomains?: string[];
+    allowedPlacements?: SecretPlacement[];
+    allowedCommands?: string[] | null;
+  }
+): Promise<boolean> {
+  const store = await loadStore();
+  const secret = store.secrets[name];
+
+  if (!secret) {
+    return false;
+  }
+
+  if (updates.allowedDomains !== undefined) {
+    validateDomains(updates.allowedDomains);
+    secret.allowedDomains = updates.allowedDomains;
+  }
+  if (updates.allowedPlacements !== undefined) {
+    secret.allowedPlacements = updates.allowedPlacements;
+  }
+  if (updates.allowedCommands !== undefined) {
+    secret.allowedCommands = updates.allowedCommands === null ? undefined : updates.allowedCommands;
+  }
+
+  await saveStore(store);
+  return true;
+}
+
 export async function removeSecret(name: string): Promise<boolean> {
   const store = await loadStore();
 

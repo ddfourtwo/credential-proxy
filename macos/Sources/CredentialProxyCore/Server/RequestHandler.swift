@@ -26,6 +26,20 @@ private struct AddCredentialBody: Codable {
     let allowedCommands: [String]?
 }
 
+private struct UpdateCredentialBody: Codable {
+    let allowedDomains: [String]?
+    let allowedPlacements: [String]?
+    let allowedCommands: [String]?
+    // Also accept short forms from MCP tool
+    let domains: [String]?
+    let placements: [String]?
+    let commands: [String]?
+
+    var resolvedDomains: [String]? { allowedDomains ?? domains }
+    var resolvedPlacements: [String]? { allowedPlacements ?? placements }
+    var resolvedCommands: [String]? { allowedCommands ?? commands }
+}
+
 private struct RotateCredentialBody: Codable {
     let value: String?
 }
@@ -39,7 +53,8 @@ public enum RequestHandler {
         secretStore: SecretStore,
         auditLogger: AuditLogger,
         mgmtToken: String?,
-        requestCredentialHandler: (@Sendable (HTTPRequest) async -> HTTPResponse)? = nil
+        requestCredentialHandler: (@Sendable (HTTPRequest) async -> HTTPResponse)? = nil,
+        updateCredentialHandler: (@Sendable (HTTPRequest) async -> HTTPResponse)? = nil
     ) {
         // MARK: Public Endpoints
 
@@ -130,6 +145,13 @@ public enum RequestHandler {
 
         router.route("POST", "/request-credential") { request in
             guard let handler = requestCredentialHandler else {
+                return .error(501, "Not available in headless mode")
+            }
+            return await handler(request)
+        }
+
+        router.route("POST", "/update-credential") { request in
+            guard let handler = updateCredentialHandler else {
                 return .error(501, "Not available in headless mode")
             }
             return await handler(request)
