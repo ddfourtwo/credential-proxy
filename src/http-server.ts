@@ -63,8 +63,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   const path = url.pathname;
   const method = req.method?.toUpperCase();
 
-  // CORS headers for local use
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // CORS headers — restrict to localhost origins only
+  const origin = req.headers['origin'];
+  if (origin && /^http:\/\/localhost:\d+$/.test(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 

@@ -11,11 +11,16 @@ public class HTTPServer {
 
     private static let maxBodySize = 1024 * 1024  // 1 MB
 
-    private static let corsHeaders: [String: String] = [
-        "Access-Control-Allow-Origin": "*",
+    private static let baseCORSHeaders: [String: String] = [
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
     ]
+
+    private static func isLocalhostOrigin(_ origin: String) -> Bool {
+        guard origin.hasPrefix("http://localhost:") else { return false }
+        let portPart = origin.dropFirst("http://localhost:".count)
+        return !portPart.isEmpty && portPart.allSatisfy(\.isNumber)
+    }
 
     public init(port: UInt16, host: String = "127.0.0.1") {
         self.port = port
@@ -121,37 +126,42 @@ public class HTTPServer {
             return
         }
 
+        let origin = request.headers["Origin"]
+
         // Handle OPTIONS preflight
         if request.method == "OPTIONS" {
             var response = HTTPResponse(status: 204)
-            response.headers = Self.corsHeaders
+            response = addCORSHeaders(to: response, origin: origin)
             send(response, on: connection)
             return
         }
 
         // Check body size
         if let body = request.body, body.count > Self.maxBodySize {
-            let response = addCORSHeaders(to: .error(413, "Request body too large"))
+            let response = addCORSHeaders(to: .error(413, "Request body too large"), origin: origin)
             send(response, on: connection)
             return
         }
 
         guard let router else {
-            let response = addCORSHeaders(to: .error(500, "No router configured"))
+            let response = addCORSHeaders(to: .error(500, "No router configured"), origin: origin)
             send(response, on: connection)
             return
         }
 
         Task {
             let response = await router.handle(request)
-            self.send(self.addCORSHeaders(to: response), on: connection)
+            self.send(self.addCORSHeaders(to: response, origin: origin), on: connection)
         }
     }
 
-    private func addCORSHeaders(to response: HTTPResponse) -> HTTPResponse {
+    private func addCORSHeaders(to response: HTTPResponse, origin: String? = nil) -> HTTPResponse {
         var r = response
-        for (key, value) in Self.corsHeaders {
+        for (key, value) in Self.baseCORSHeaders {
             r.headers[key] = value
+        }
+        if let origin, Self.isLocalhostOrigin(origin) {
+            r.headers["Access-Control-Allow-Origin"] = origin
         }
         return r
     }
