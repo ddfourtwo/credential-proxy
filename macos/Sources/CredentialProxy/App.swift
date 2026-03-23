@@ -17,14 +17,15 @@ struct CredentialProxyApp: App {
                     if Self.registerMCPIfNeeded() {
                         showMCPRegistered = true
                     }
-                    // Post-unlock setup: sign first, then daemon, then server
+                    // Post-unlock setup: daemon export may change the key
+                    // (migrateToSharedKey), so it must run BEFORE signing.
                     Task {
-                        // Sign metadata if signature is missing (requires system auth)
-                        await Self.signMetadataIfNeeded()
-                        // Auto-enable daemon mode (export key so daemon can decrypt secrets)
+                        // Auto-enable daemon mode (may migrate key format)
                         if !SealKeyManager.shared.daemonKeyExists {
                             _ = try? SealKeyManager.shared.exportKeyForDaemon()
                         }
+                        // Sign metadata if signature is missing (requires system auth)
+                        await Self.signMetadataIfNeeded()
                         // Start server after everything is signed and ready
                         await MainActor.run {
                             ServerManager.startShared()
