@@ -5,7 +5,7 @@ set -euo pipefail
 # Requires the macOS app to be in "Ready for Update" mode (Prepare for Update button).
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_PATH="$HOME/Applications/Credential Proxy.app"
+APP_PATH="/Applications/Credential Proxy.app"
 MIGRATION_FILE="$HOME/Library/Application Support/credential-proxy/seal.migration"
 
 RED='\033[0;31m'

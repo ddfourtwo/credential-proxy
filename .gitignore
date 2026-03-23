@@ -5,3 +5,4 @@ dist/
 tasks.json
 macos/.build/
 .planning/
+*.dmg

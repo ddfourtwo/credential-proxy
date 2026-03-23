@@ -7,9 +7,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_NAME="Credential Proxy.app"
-INSTALL_DIR="$HOME/Applications"
+INSTALL_DIR="/Applications"
 APP_PATH="$INSTALL_DIR/$APP_NAME"
-CLAUDE_JSON="$HOME/.claude.json"
 MCP_RELAY_DIR="$APP_PATH/Contents/Resources/mcp-relay"
 
 RED='\033[0;31m'
@@ -95,68 +94,10 @@ cd "$SCRIPT_DIR"
 codesign -s - -f "$APP_PATH/Contents/MacOS/CredentialProxy" 2>/dev/null
 success "App bundle created and signed at $APP_PATH"
 
-# --- Step 4: Register MCP server in Claude config ---
-
-info "Configuring Claude Code MCP server..."
-
-# MCP stdio server in relay mode: forwards tool calls to the app's HTTP server.
-# The stdio server never accesses secrets directly.
-MCP_INDEX="$MCP_RELAY_DIR/index.js"
-
-if command -v ctmux-mcp >/dev/null 2>&1; then
-    # Use ctmux-mcp registry for multi-backend support
-    ctmux-mcp register credential-proxy "{
-        \"command\": \"node\",
-        \"args\": [\"$MCP_RELAY_DIR/index.js\"],
-        \"env\": {\"CREDENTIAL_PROXY_APP_URL\": \"http://127.0.0.1:11111\"},
-        \"backendOverrides\": {
-            \"claude-code\": {\"type\": \"stdio\"},
-            \"pi\": {
-                \"lifecycle\": \"keep-alive\",
-                \"directTools\": true,
-                \"args\": [\"$MCP_RELAY_DIR/index.js\"]
-            }
-        }
-    }"
-    ctmux-mcp sync
-    success "Registered credential-proxy in MCP registry"
-else
-    # Fallback: direct ~/.claude.json write
-    if [ -f "$CLAUDE_JSON" ]; then
-        node -e "
-            const fs = require('fs');
-            const config = JSON.parse(fs.readFileSync('$CLAUDE_JSON', 'utf8'));
-            config.mcpServers = config.mcpServers || {};
-            config.mcpServers['credential-proxy'] = {
-                type: 'stdio',
-                command: 'node',
-                args: ['$MCP_INDEX'],
-                env: {
-                    CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111'
-                }
-            };
-            fs.writeFileSync('$CLAUDE_JSON', JSON.stringify(config, null, 2));
-        "
-    else
-        node -e "
-            const fs = require('fs');
-            const config = {
-                mcpServers: {
-                    'credential-proxy': {
-                        type: 'stdio',
-                        command: 'node',
-                        args: ['$MCP_INDEX'],
-                        env: {
-                            CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111'
-                        }
-                    }
-                }
-            };
-            fs.writeFileSync('$CLAUDE_JSON', JSON.stringify(config, null, 2));
-        "
-    fi
-    success "Claude Code MCP relay configured (stdio → native HTTP server)"
-fi
+# --- Step 4: MCP auto-registration ---
+# The app auto-registers in ~/.claude.json on first launch.
+# No manual configuration needed.
+info "MCP server will auto-register when the app launches"
 
 # --- Step 5: Migrate existing secrets to Keychain ---
 
@@ -260,6 +201,9 @@ success "Launch agent configured (starts at login)"
 
 # --- Step 7: Launch the app ---
 
+info "Indexing for Spotlight..."
+mdimport "$APP_PATH" 2>/dev/null || true
+
 info "Launching Credential Proxy..."
 open "$APP_PATH"
 success "Credential Proxy is running"
@@ -269,11 +213,10 @@ echo -e "${GREEN}Installation complete!${RESET}"
 echo ""
 echo "  App:         $APP_PATH"
 echo "  Data:        $NEW_DATA_DIR"
-echo "  Secrets:     macOS Keychain (service: com.credential-proxy.secrets)"
-echo "  HTTP Server: Native Swift (compiled into app binary)"
-echo "  MCP Relay:   stdio → http://127.0.0.1:11111"
+echo "  MCP:         Auto-registered on first launch"
 echo ""
-echo "  The key icon in your menu bar indicates Credential Proxy is running."
-echo "  Click it to manage credentials."
+echo "  1. Look for the key icon in your menu bar"
+echo "  2. Set a PIN (first time) or enter your PIN to unlock"
+echo "  3. Restart Claude Code to load the MCP server"
 echo ""
-echo -e "${DIM}Restart Claude Code to load the MCP server.${RESET}"
+echo "  You can search for \"Credential Proxy\" in Spotlight to launch it."
