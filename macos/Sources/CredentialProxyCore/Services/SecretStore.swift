@@ -73,16 +73,6 @@ public actor SecretStore {
         }
     }
 
-    /// Sign the existing secrets.json if no signature file exists yet.
-    /// Call this ONCE after unlock during app startup — not from HTTP endpoints.
-    public func signIfNeeded() throws {
-        guard SealKeyManager.shared.isUnlocked else { return }
-        guard FileManager.default.fileExists(atPath: secretsFilePath.path) else { return }
-        guard !FileManager.default.fileExists(atPath: signaturePath.path) else { return }
-        let data = try Data(contentsOf: secretsFilePath)
-        try signData(data)
-    }
-
     private func signData(_ data: Data) throws {
         let signature = try SealKeyManager.shared.hmac(data)
         try signature.write(to: signaturePath, options: .atomic)
