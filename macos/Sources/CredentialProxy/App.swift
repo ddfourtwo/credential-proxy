@@ -11,6 +11,10 @@ struct CredentialProxyApp: App {
             if !isUnlocked {
                 PinEntryView {
                     isUnlocked = true
+                    Task {
+                        // Sign metadata on first run after upgrade (before any HTTP endpoints load)
+                        try? await SecretStore.shared.signIfNeeded()
+                    }
                     ServerManager.startShared()
                 }
                 .padding(4)

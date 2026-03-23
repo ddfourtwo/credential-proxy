@@ -33,16 +33,14 @@ public actor SecretStore {
 
         let data = try Data(contentsOf: secretsFilePath)
 
-        // Verify HMAC if seal key is available and signature file exists
+        // Verify HMAC if seal key is available
         if SealKeyManager.shared.isUnlocked {
-            if FileManager.default.fileExists(atPath: signaturePath.path) {
-                let signature = try Data(contentsOf: signaturePath)
-                guard try SealKeyManager.shared.verifyHMAC(data, signature: signature) else {
-                    throw SecretStoreError.metadataTampered
-                }
-            } else {
-                // No signature yet — sign the existing file (first run after upgrade)
-                try signData(data)
+            guard FileManager.default.fileExists(atPath: signaturePath.path) else {
+                throw SecretStoreError.signatureMissing
+            }
+            let signature = try Data(contentsOf: signaturePath)
+            guard try SealKeyManager.shared.verifyHMAC(data, signature: signature) else {
+                throw SecretStoreError.metadataTampered
             }
         }
 
@@ -73,6 +71,16 @@ public actor SecretStore {
         if SealKeyManager.shared.isUnlocked {
             try signData(data)
         }
+    }
+
+    /// Sign the existing secrets.json if no signature file exists yet.
+    /// Call this ONCE after unlock during app startup — not from HTTP endpoints.
+    public func signIfNeeded() throws {
+        guard SealKeyManager.shared.isUnlocked else { return }
+        guard FileManager.default.fileExists(atPath: secretsFilePath.path) else { return }
+        guard !FileManager.default.fileExists(atPath: signaturePath.path) else { return }
+        let data = try Data(contentsOf: secretsFilePath)
+        try signData(data)
     }
 
     private func signData(_ data: Data) throws {
@@ -311,6 +319,7 @@ public enum SecretStoreError: LocalizedError {
     case invalidDomain(String)
     case cannotRotate1Password
     case metadataTampered
+    case signatureMissing
 
     public var errorDescription: String? {
         switch self {
@@ -324,6 +333,8 @@ public enum SecretStoreError: LocalizedError {
             return "Cannot rotate 1Password secrets. Update the value in 1Password instead."
         case .metadataTampered:
             return "secrets.json has been modified outside the app — refusing to load. Use the app UI to manage credentials."
+        case .signatureMissing:
+            return "secrets.json.sig is missing — refusing to load. Restart the app to re-sign, or use the app UI to manage credentials."
         }
     }
 }
