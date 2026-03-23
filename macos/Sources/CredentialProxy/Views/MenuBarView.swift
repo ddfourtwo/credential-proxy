@@ -6,7 +6,6 @@ struct MenuBarView: View {
     @EnvironmentObject var apiClient: APIClient
     @State private var credentials: [Credential] = []
     @State private var updateStatus: String?
-    @State private var daemonStatus: String?
     @State private var showPinPrompt = false
     @State private var pinInput = ""
     @Environment(\.openWindow) private var openWindow
@@ -102,21 +101,6 @@ struct MenuBarView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 12)
 
-            Button {
-                enableDaemonMode()
-            } label: {
-                Label("Enable Daemon Mode", systemImage: "server.rack")
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 12)
-
-            if let dStatus = daemonStatus {
-                Text(dStatus)
-                    .font(.caption2)
-                    .foregroundStyle(dStatus.hasPrefix("Error") || dStatus.hasPrefix("Unlock") ? .red : .green)
-                    .padding(.horizontal, 12)
-            }
-
             if showPinPrompt {
                 HStack(spacing: 6) {
                     SecureField("Enter PIN", text: $pinInput)
@@ -156,27 +140,6 @@ struct MenuBarView: View {
             if serverManager.isRunning {
                 credentials = (try? await apiClient.listCredentials()) ?? []
             }
-        }
-    }
-
-    private func enableDaemonMode() {
-        daemonStatus = nil
-
-        guard SealKeyManager.shared.isUnlocked else {
-            daemonStatus = "Unlock with PIN first"
-            return
-        }
-
-        guard !SealKeyManager.shared.daemonKeyExists else {
-            daemonStatus = "Daemon mode is already enabled"
-            return
-        }
-
-        do {
-            let _ = try SealKeyManager.shared.exportKeyForDaemon()
-            daemonStatus = "Daemon key exported. Run ./install-daemon.sh to install."
-        } catch {
-            daemonStatus = "Error: \(error.localizedDescription)"
         }
     }
 

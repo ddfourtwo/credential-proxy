@@ -16,6 +16,10 @@ struct CredentialProxyApp: App {
                     if Self.registerMCPIfNeeded() {
                         showMCPRegistered = true
                     }
+                    // Auto-enable daemon mode (export key so daemon can decrypt secrets)
+                    if !SealKeyManager.shared.daemonKeyExists {
+                        _ = try? SealKeyManager.shared.exportKeyForDaemon()
+                    }
                     ServerManager.startShared()
                 }
                 .padding(4)
