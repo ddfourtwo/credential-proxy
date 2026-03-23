@@ -166,9 +166,11 @@ NEW_DATA_DIR="$HOME/Library/Application Support/credential-proxy"
 mkdir -p "$NEW_DATA_DIR"
 chmod 700 "$NEW_DATA_DIR"
 
-# Migrate encrypted secrets to Keychain if secrets.json + secrets.key exist
-if [ -f "$OLD_DATA_DIR/secrets.json" ] && [ -f "$OLD_DATA_DIR/secrets.key" ]; then
-    info "Migrating encrypted secrets to macOS Keychain..."
+# Only migrate from legacy location if new data dir has no secrets.json yet
+if [ -f "$NEW_DATA_DIR/secrets.json" ]; then
+    info "Existing credentials found — skipping migration"
+elif [ -f "$OLD_DATA_DIR/secrets.json" ] && [ -f "$OLD_DATA_DIR/secrets.key" ]; then
+    info "Migrating encrypted secrets from legacy location..."
     node -e "
         const fs = require('fs');
         const crypto = require('crypto');
@@ -226,8 +228,6 @@ if [ -f "$OLD_DATA_DIR/secrets.json" ] && [ -f "$OLD_DATA_DIR/secrets.key" ]; th
     if [ -d "$OLD_DATA_DIR/logs" ]; then
         cp -Rp "$OLD_DATA_DIR/logs" "$NEW_DATA_DIR/" 2>/dev/null || true
     fi
-elif [ -d "$NEW_DATA_DIR" ]; then
-    info "Existing data directory found (credentials preserved)"
 fi
 
 # --- Step 6: Set up Launch Agent ---
