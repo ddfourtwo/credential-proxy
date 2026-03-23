@@ -57,12 +57,11 @@ success "Pre-built macOS binary found"
 info "Creating app bundle..."
 mkdir -p "$INSTALL_DIR"
 
-# Remove old installation
-if [ -d "$APP_PATH" ]; then
-    pkill -f "$APP_PATH/Contents/MacOS/CredentialProxy" 2>/dev/null || true
-    sleep 0.5
-    rm -rf "$APP_PATH"
-fi
+# Remove old installation (current + legacy ~/Applications location)
+pkill -x CredentialProxy 2>/dev/null || true
+sleep 0.5
+rm -rf "$APP_PATH"
+rm -rf "$HOME/Applications/$APP_NAME"
 
 # Create bundle structure
 mkdir -p "$APP_PATH/Contents/MacOS"
