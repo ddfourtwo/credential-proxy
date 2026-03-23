@@ -23,25 +23,29 @@ npm run typecheck  # type-check without emitting
 
 ## Key Design Decisions
 
-- Master key stored in `~/.local/share/credential-proxy/secrets.key` (file-based by default, macOS Keychain opt-in via `CREDENTIAL_PROXY_USE_KEYCHAIN=1`)
-- Multi-instance support via `CREDENTIAL_PROXY_INSTANCE` env var (falls back to `CLAUDETMUX_INSTANCE` for backward compat)
-- Data dir override: `CREDENTIAL_PROXY_DATA_DIR`
-- Secrets file format is versioned (currently v2) with automatic migration from v1
+- Seal key derived from user PIN + salt (PBKDF2, 200k iterations) — no binary hash binding
+- Secrets stored as AES-256-GCM encrypted `.sealed` files in `~/Library/Application Support/credential-proxy/secrets/`
+- Metadata file (`secrets.json`) is HMAC-signed with the seal key to prevent agent tampering
+- Daemon mode auto-enabled on unlock (key exported for headless operation)
+- App auto-registers MCP server in `~/.claude.json` on first launch
 - 1Password references supported as alternative to direct encryption
 
 ## Installation
 
 ```bash
-npm run build
-node dist/cli/index.js install   # copies to ~/.claude/mcp-servers/, registers in ~/.claude.json
+./install.sh    # builds MCP relay, installs app to /Applications, sets up LaunchAgent
 ```
 
-## Update Procedure
+Or for end users: download the DMG, drag to Applications, open, set PIN.
 
-**Before updating, always confirm the user has clicked "Prepare for Update" in the macOS menu bar UI.** The script will refuse to run without it.
+## Update
 
 ```bash
-./reinstall.sh
+./update.sh     # pulls latest, replaces binary + MCP relay, relaunches
 ```
 
-This pulls, builds, installs the MCP server, rebuilds the macOS binary, replaces it, and relaunches the app. User then enters PIN to complete migration and restarts Claude Code.
+## Building the DMG
+
+```bash
+./build-dmg.sh  # creates distributable DMG from installed app
+```
