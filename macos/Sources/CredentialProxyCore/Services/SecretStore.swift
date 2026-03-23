@@ -1,11 +1,17 @@
 import Foundation
 
 /// Manages secret metadata (JSON file) and secret values (Keychain).
+///
+/// The metadata file (secrets.json) is HMAC-signed with the seal key.
+/// On every save, the HMAC is written to secrets.json.sig.
+/// On every load, the HMAC is verified — if tampered, the store refuses to load.
+/// This prevents agents from widening allowedDomains by editing the file directly.
 public actor SecretStore {
     public static let shared = SecretStore()
 
     private let keychain = KeychainManager.shared
     private let secretsFilePath: URL
+    private var signaturePath: URL { secretsFilePath.appendingPathExtension("sig") }
 
     private static let namePattern = try! NSRegularExpression(pattern: "^[A-Z][A-Z0-9_]*$")
     private static let domainPattern = try! NSRegularExpression(
@@ -26,6 +32,20 @@ public actor SecretStore {
         }
 
         let data = try Data(contentsOf: secretsFilePath)
+
+        // Verify HMAC if seal key is available and signature file exists
+        if SealKeyManager.shared.isUnlocked {
+            if FileManager.default.fileExists(atPath: signaturePath.path) {
+                let signature = try Data(contentsOf: signaturePath)
+                guard try SealKeyManager.shared.verifyHMAC(data, signature: signature) else {
+                    throw SecretStoreError.metadataTampered
+                }
+            } else {
+                // No signature yet — sign the existing file (first run after upgrade)
+                try signData(data)
+            }
+        }
+
         let store = try JSONDecoder().decode(SecretsStore.self, from: data)
 
         if store.version == 1 {
@@ -48,6 +68,17 @@ public actor SecretStore {
         let data = try encoder.encode(store)
         try data.write(to: secretsFilePath, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: secretsFilePath.path)
+
+        // Sign the metadata file
+        if SealKeyManager.shared.isUnlocked {
+            try signData(data)
+        }
+    }
+
+    private func signData(_ data: Data) throws {
+        let signature = try SealKeyManager.shared.hmac(data)
+        try signature.write(to: signaturePath, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: signaturePath.path)
     }
 
     public func migrateV1ToV2(_ store: SecretsStore) throws -> SecretsStore {
@@ -279,6 +310,7 @@ public enum SecretStoreError: LocalizedError {
     case noDomainsProvided
     case invalidDomain(String)
     case cannotRotate1Password
+    case metadataTampered
 
     public var errorDescription: String? {
         switch self {
@@ -290,6 +322,8 @@ public enum SecretStoreError: LocalizedError {
             return "Invalid domain pattern \"\(domain)\""
         case .cannotRotate1Password:
             return "Cannot rotate 1Password secrets. Update the value in 1Password instead."
+        case .metadataTampered:
+            return "secrets.json has been modified outside the app — refusing to load. Use the app UI to manage credentials."
         }
     }
 }

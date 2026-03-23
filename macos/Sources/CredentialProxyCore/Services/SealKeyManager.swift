@@ -374,6 +374,25 @@ public final class SealKeyManager {
         return SymmetricKey(data: derivedKey)
     }
 
+    // MARK: - HMAC
+
+    /// Compute HMAC-SHA256 over data using the seal key.
+    public func hmac(_ data: Data) throws -> Data {
+        guard let key = cachedKey else {
+            throw SealKeyError.notUnlocked
+        }
+        let auth = HMAC<SHA256>.authenticationCode(for: data, using: key)
+        return Data(auth)
+    }
+
+    /// Verify HMAC-SHA256 over data using the seal key.
+    public func verifyHMAC(_ data: Data, signature: Data) throws -> Bool {
+        guard let key = cachedKey else {
+            throw SealKeyError.notUnlocked
+        }
+        return HMAC<SHA256>.isValidAuthenticationCode(signature, authenticating: data, using: key)
+    }
+
     // MARK: - Encrypt / Decrypt Secrets
 
     public func encrypt(_ plaintext: String) throws -> Data {
