@@ -83,7 +83,7 @@ export const installCommand = new Command('install')
       } catch {}
 
       if (hasCtmuxMcp) {
-        const appRelayPath = join(homedir(), 'Applications', 'Credential Proxy.app', 'Contents', 'Resources', 'mcp-relay', 'index.js');
+        const appRelayPath = join('/Applications', 'Credential Proxy.app', 'Contents', 'Resources', 'mcp-relay', 'index.js');
         const registryConfig = {
           command: 'node',
           args: [join(INSTALL_DIR, 'index.js')],
@@ -116,7 +116,7 @@ export const installCommand = new Command('install')
 
         // If the macOS app is installed, set relay mode so the MCP server
         // forwards tool calls to the app's HTTP server (which holds the secrets).
-        const appPath = join(homedir(), 'Applications', 'Credential Proxy.app');
+        const appPath = join('/Applications', 'Credential Proxy.app');
         if (existsSync(appPath)) {
           mcpEntry.env = {
             CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:11111'

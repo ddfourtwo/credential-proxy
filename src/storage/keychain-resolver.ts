@@ -10,7 +10,7 @@ const execFileAsync = promisify(execFile);
 function getResolverPath(): string | null {
   // 1. Inside .app bundle (when launched by the app)
   const appBundlePath = join(
-    homedir(), 'Applications', 'Credential Proxy.app',
+    '/Applications', 'Credential Proxy.app',
     'Contents', 'Resources', 'credential-proxy-resolve'
   );
   if (existsSync(appBundlePath)) return appBundlePath;
