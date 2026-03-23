@@ -1,4 +1,5 @@
 import SwiftUI
+import LocalAuthentication
 import CredentialProxyCore
 
 struct CredentialProxyApp: App {
@@ -16,11 +17,19 @@ struct CredentialProxyApp: App {
                     if Self.registerMCPIfNeeded() {
                         showMCPRegistered = true
                     }
-                    // Auto-enable daemon mode (export key so daemon can decrypt secrets)
-                    if !SealKeyManager.shared.daemonKeyExists {
-                        _ = try? SealKeyManager.shared.exportKeyForDaemon()
+                    // Post-unlock setup: sign first, then daemon, then server
+                    Task {
+                        // Sign metadata if signature is missing (requires system auth)
+                        await Self.signMetadataIfNeeded()
+                        // Auto-enable daemon mode (export key so daemon can decrypt secrets)
+                        if !SealKeyManager.shared.daemonKeyExists {
+                            _ = try? SealKeyManager.shared.exportKeyForDaemon()
+                        }
+                        // Start server after everything is signed and ready
+                        await MainActor.run {
+                            ServerManager.startShared()
+                        }
                     }
-                    ServerManager.startShared()
                 }
                 .padding(4)
             } else {
@@ -43,6 +52,45 @@ struct CredentialProxyApp: App {
         Settings {
             SettingsView()
                 .environmentObject(serverManager)
+        }
+    }
+
+    // MARK: - Metadata Signing
+
+    /// If secrets.json exists but has no HMAC signature, prompt for
+    /// Touch ID / system password before signing. This prevents an agent
+    /// from tampering with the file and getting it silently re-signed.
+    static func signMetadataIfNeeded() async {
+        guard await SecretStore.shared.needsSignature else { return }
+
+        let context = LAContext()
+        context.localizedReason = "sign credential metadata"
+
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            NSLog("[Sign] authentication not available: \(error?.localizedDescription ?? "unknown")")
+            return
+        }
+
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            context.evaluatePolicy(
+                .deviceOwnerAuthentication,
+                localizedReason: "Credential Proxy needs to sign its metadata file. This is a one-time operation after an update."
+            ) { success, authError in
+                if success {
+                    Task {
+                        do {
+                            try await SecretStore.shared.resignMetadata()
+                            NSLog("[Sign] metadata signed after user authentication")
+                        } catch {
+                            NSLog("[Sign] failed to sign: \(error)")
+                        }
+                    }
+                } else {
+                    NSLog("[Sign] user declined authentication: \(authError?.localizedDescription ?? "cancelled")")
+                }
+                continuation.resume()
+            }
         }
     }
 

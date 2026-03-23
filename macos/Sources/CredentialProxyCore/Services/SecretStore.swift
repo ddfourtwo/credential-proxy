@@ -73,6 +73,22 @@ public actor SecretStore {
         }
     }
 
+    /// Whether the metadata file exists but has no HMAC signature.
+    public var needsSignature: Bool {
+        FileManager.default.fileExists(atPath: secretsFilePath.path)
+            && !FileManager.default.fileExists(atPath: signaturePath.path)
+    }
+
+    /// Read the current secrets.json, re-write it through saveStore() to generate a valid signature.
+    /// Call this only after explicit user authentication (Touch ID / system password).
+    public func resignMetadata() throws {
+        // Bypass HMAC check — read raw data and decode
+        let data = try Data(contentsOf: secretsFilePath)
+        let store = try JSONDecoder().decode(SecretsStore.self, from: data)
+        // saveStore() writes the file and signs it
+        try saveStore(store)
+    }
+
     private func signData(_ data: Data) throws {
         let signature = try SealKeyManager.shared.hmac(data)
         try signature.write(to: signaturePath, options: .atomic)
