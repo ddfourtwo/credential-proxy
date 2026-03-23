@@ -75,6 +75,20 @@ final class APIClient: ObservableObject {
         try checkResponse(response, data: data)
     }
 
+    func revealCredential(name: String) async throws -> String {
+        let url = URL(string: "/credentials/\(name)/reveal", relativeTo: baseURL)!
+        var request = URLRequest(url: url)
+        addAuthHeader(&request)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let value = json?["value"] as? String else {
+            throw APIError.serverError(500, "Missing value in response")
+        }
+        return value
+    }
+
     func rotateCredential(name: String, newValue: String) async throws {
         let url = URL(string: "/credentials/\(name)/rotate", relativeTo: baseURL)!
         var request = URLRequest(url: url)

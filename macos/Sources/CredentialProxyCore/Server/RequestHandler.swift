@@ -224,6 +224,31 @@ public enum RequestHandler {
             }
         }
 
+        router.route("GET", "/credentials/:name/reveal") { request in
+            if let response = requireMgmtAuth(request, mgmtToken: mgmtToken) {
+                return response
+            }
+
+            guard let name = request.params["name"] else {
+                return .error(400, "Missing credential name")
+            }
+
+            do {
+                guard let value = try await secretStore.getSecret(name: name) else {
+                    return .error(404, "Secret \"\(name)\" not found")
+                }
+                auditLogger.log(AuditEvent(
+                    type: .SECRET_USED,
+                    timestamp: ISO8601DateFormatter().string(from: Date()),
+                    secret: name,
+                    reason: "revealed via GUI"
+                ))
+                return .json(200, ["name": AnyCodableValue.string(name), "value": AnyCodableValue.string(value)])
+            } catch {
+                return .error(500, error.localizedDescription)
+            }
+        }
+
         router.route("POST", "/credentials/:name/rotate") { request in
             if let response = requireMgmtAuth(request, mgmtToken: mgmtToken) {
                 return response

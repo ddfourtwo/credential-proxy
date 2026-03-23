@@ -1,4 +1,5 @@
 import SwiftUI
+import LocalAuthentication
 import CredentialProxyCore
 
 struct CredentialListView: View {
@@ -10,6 +11,13 @@ struct CredentialListView: View {
     @State private var deleteTarget: Credential?
     @State private var errorMessage: String?
     @State private var isLoading = false
+    @State private var revealedSecret: RevealedSecret?
+
+    private struct RevealedSecret: Identifiable {
+        let id = UUID()
+        let name: String
+        let value: String
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -113,6 +121,14 @@ struct CredentialListView: View {
 
                     TableColumn("") { cred in
                         HStack(spacing: 4) {
+                            Button {
+                                revealSecret(cred)
+                            } label: {
+                                Image(systemName: "eye")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Reveal")
+
                             if cred.sourceType != "1password" {
                                 Button {
                                     showingRotate = cred
@@ -132,7 +148,7 @@ struct CredentialListView: View {
                             .help("Delete")
                         }
                     }
-                    .width(60)
+                    .width(80)
                 }
             }
         }
@@ -165,9 +181,42 @@ struct CredentialListView: View {
         } message: {
             Text("Are you sure you want to delete \"\(deleteTarget?.name ?? "")\"? This cannot be undone.")
         }
+        .sheet(item: $revealedSecret) { secret in
+            RevealSecretView(name: secret.name, value: secret.value)
+        }
         .task(id: serverManager.isRunning) {
             if serverManager.isRunning {
                 await loadCredentials()
+            }
+        }
+    }
+
+    private func revealSecret(_ credential: Credential) {
+        let context = LAContext()
+        context.localizedReason = "reveal credential"
+
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            errorMessage = "Authentication not available: \(error?.localizedDescription ?? "unknown")"
+            return
+        }
+
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Reveal \"\(credential.name)\"") { success, authError in
+            DispatchQueue.main.async {
+                if success {
+                    Task {
+                        do {
+                            let value = try await apiClient.revealCredential(name: credential.name)
+                            revealedSecret = RevealedSecret(name: credential.name, value: value)
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                } else if let authError {
+                    if (authError as NSError).code != LAError.userCancel.rawValue {
+                        errorMessage = authError.localizedDescription
+                    }
+                }
             }
         }
     }
@@ -228,5 +277,47 @@ struct RotateCredentialView: View {
         }
         .padding()
         .frame(width: 400)
+    }
+}
+
+struct RevealSecretView: View {
+    let name: String
+    let value: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(name)
+                .font(.headline)
+
+            GroupBox {
+                ScrollView {
+                    Text(value)
+                        .font(.system(.body, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 200)
+            }
+
+            HStack {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(value, forType: .string)
+                    copied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copied = false }
+                } label: {
+                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                }
+
+                Spacer()
+
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding()
+        .frame(width: 450)
     }
 }
