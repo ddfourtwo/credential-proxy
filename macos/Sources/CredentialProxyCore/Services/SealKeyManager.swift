@@ -50,7 +50,7 @@ public final class SealKeyManager {
             throw SealKeyError.saltAlreadyExists
         }
         let salt = generateSalt()
-        let key = try deriveKey(pin: pin, salt: salt)
+        let key = try deriveMigrationKey(pin: pin, salt: salt)
 
         // Encrypt verification string
         let verifyData = try encrypt(verificationPlaintext, key: key)
@@ -58,6 +58,9 @@ public final class SealKeyManager {
         // Write salt and verification to files
         try salt.write(to: URL(fileURLWithPath: saltPath))
         try verifyData.write(to: URL(fileURLWithPath: verifyPath))
+
+        // Mark as shared key format (no binary hash)
+        try Data("shared".utf8).write(to: URL(fileURLWithPath: sharedKeyPath), options: .atomic)
 
         // Set restrictive permissions
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: saltPath)
@@ -78,7 +81,8 @@ public final class SealKeyManager {
             throw SealKeyError.noSealData
         }
 
-        // Use migration key if already migrated to shared key format
+        // Use shared key (PIN + salt only) if already migrated, otherwise
+        // try legacy binary-bound key and auto-migrate on success.
         let key: SymmetricKey
         if FileManager.default.fileExists(atPath: sharedKeyPath) {
             key = try deriveMigrationKey(pin: pin, salt: salt)
@@ -94,6 +98,12 @@ public final class SealKeyManager {
 
         cachedKey = key
         cachedPin = pin
+
+        // Auto-migrate legacy binary-bound keys to shared format
+        if !FileManager.default.fileExists(atPath: sharedKeyPath) {
+            try? migrateToSharedKey()
+        }
+
         return true
     }
 
@@ -179,29 +189,26 @@ public final class SealKeyManager {
             return false // Wrong PIN
         }
 
-        // Derive new binary-bound key
-        let newKey = try deriveKey(pin: pin, salt: salt)
-
-        // Re-encrypt each secret with the new key and write to files
+        // Write secrets with migration key (no longer re-encrypting to binary-bound key)
         let secretsDir = dataDir + "/secrets"
         try? FileManager.default.createDirectory(atPath: secretsDir, withIntermediateDirectories: true)
 
         for secret in blob.secrets {
-            guard let plaintext = try? decrypt(secret.data, key: migrationKey) else { continue }
-            let newData = try encrypt(plaintext, key: newKey)
             let path = secretsDir + "/" + secret.name + ".sealed"
-            try newData.write(to: URL(fileURLWithPath: path), options: .atomic)
+            try secret.data.write(to: URL(fileURLWithPath: path), options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
         }
 
-        // Update verification blob for new key
-        let newVerify = try encrypt(verificationPlaintext, key: newKey)
-        try newVerify.write(to: URL(fileURLWithPath: verifyPath))
+        // Update verification blob (already encrypted with migration key in the blob)
+        try blob.verify.write(to: URL(fileURLWithPath: verifyPath), options: .atomic)
+
+        // Mark as shared key format
+        try Data("shared".utf8).write(to: URL(fileURLWithPath: sharedKeyPath), options: .atomic)
 
         // Clean up migration file
         try? FileManager.default.removeItem(atPath: migrationPath)
 
-        cachedKey = newKey
+        cachedKey = migrationKey
         cachedPin = pin
         return true
     }
