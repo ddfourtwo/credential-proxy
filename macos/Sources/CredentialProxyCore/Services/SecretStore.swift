@@ -174,8 +174,14 @@ public actor SecretStore {
 
     public func listSecrets() throws -> [SecretInfo] {
         let store = try loadStore()
+        let existingFiles = Set(try keychain.list())
 
-        return store.secrets.map { name, meta in
+        return store.secrets.compactMap { name, meta in
+            // Skip orphaned entries (metadata exists but .sealed file is missing)
+            if case .encrypted = meta.source, !existingFiles.contains(name) {
+                return nil
+            }
+
             let sourceType: String
             switch meta.source {
             case .encrypted:

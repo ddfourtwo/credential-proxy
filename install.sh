@@ -29,6 +29,25 @@ if [ "$NODE_VERSION" -lt 20 ]; then
     error "Node.js 20+ is required (found v$(node -v))"
 fi
 
+# --- Guard against clobbering existing installation ---
+
+DATA_DIR="$HOME/Library/Application Support/credential-proxy"
+if [ -d "$APP_PATH" ] && [ -f "$DATA_DIR/seal.salt" ]; then
+    echo ""
+    echo -e "${RED}An existing Credential Proxy installation with credentials was detected.${RESET}"
+    echo ""
+    echo "  Running install.sh would replace the binary, which can make"
+    echo "  existing credentials undecryptable."
+    echo ""
+    echo "  To update safely:  ./update.sh"
+    echo "  To force reinstall: ./install.sh --force"
+    echo ""
+    if [[ "${1:-}" != "--force" ]]; then
+        exit 1
+    fi
+    echo -e "${DIM}--force specified, proceeding with reinstall...${RESET}"
+fi
+
 echo ""
 echo "Installing Credential Proxy..."
 echo ""

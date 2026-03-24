@@ -126,6 +126,11 @@ public final class SealKeyManager {
                 try? FileManager.default.removeItem(atPath: secretsDir + "/" + file)
             }
         }
+        // Delete metadata file and signature — prevents orphaned entries
+        let secretsJson = dataDir + "/secrets.json"
+        let secretsSig = dataDir + "/secrets.json.sig"
+        try? FileManager.default.removeItem(atPath: secretsJson)
+        try? FileManager.default.removeItem(atPath: secretsSig)
     }
 
     // MARK: - Update Migration
