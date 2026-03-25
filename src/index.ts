@@ -36,7 +36,8 @@ async function relayToApp(
   endpoint: string,
   method: string,
   body?: unknown,
-  queryParams?: Record<string, string>
+  queryParams?: Record<string, string>,
+  timeoutMs?: number
 ): Promise<unknown> {
   const url = new URL(endpoint, APP_URL);
   if (queryParams) {
@@ -51,6 +52,12 @@ async function relayToApp(
   };
   if (body && method !== 'GET') {
     opts.body = JSON.stringify(body);
+  }
+
+  // For long-running requests (e.g. proxy_exec), set fetch timeout to match.
+  // Default 30s for normal requests; exec passes its own timeout + buffer.
+  if (timeoutMs) {
+    opts.signal = AbortSignal.timeout(timeoutMs);
   }
 
   const maxRetries = 3;
@@ -117,9 +124,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case 'proxy_request':
           result = await relayToApp('/proxy', 'POST', args);
           break;
-        case 'proxy_exec':
-          result = await relayToApp('/exec', 'POST', args);
+        case 'proxy_exec': {
+          // Match fetch timeout to the command's timeout + 10s buffer
+          const execArgs = args as unknown as ProxyExecInput;
+          const execTimeout = (execArgs.timeout ?? 30_000) + 10_000;
+          result = await relayToApp('/exec', 'POST', args, undefined, execTimeout);
           break;
+        }
         case 'update_credential':
           result = await relayToApp('/update-credential', 'POST', args);
           break;
@@ -176,6 +187,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     const isConnectionError = msg.includes('fetch failed') || msg.includes('ECONNREFUSED');
+    const isTimeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+
+    if (isTimeout && APP_URL) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `The command timed out waiting for Credential Proxy at ${APP_URL}. ` +
+              'The command may still be running on the server. ' +
+              'Consider increasing the timeout parameter for long-running commands.',
+          },
+        ],
+        isError: true,
+      };
+    }
 
     if (isConnectionError && APP_URL) {
       return {

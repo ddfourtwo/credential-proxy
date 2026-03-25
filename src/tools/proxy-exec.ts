@@ -235,9 +235,14 @@ export async function handleProxyExec(
   // Execute command
   return new Promise((resolve) => {
     const timeout = input.timeout ?? 30_000;
+    const maxOutputBytes = 10 * 1024 * 1024; // 10 MB cap per stream
     let timedOut = false;
     let stdout = '';
     let stderr = '';
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+    let stdoutTruncated = false;
+    let stderrTruncated = false;
 
     const proc = spawn(substitutedCommand[0], substitutedCommand.slice(1), {
       cwd: input.cwd,
@@ -250,12 +255,26 @@ export async function handleProxyExec(
       proc.kill('SIGKILL');
     }, timeout);
 
-    proc.stdout.on('data', (data) => {
-      stdout += data.toString();
+    proc.stdout.on('data', (data: Buffer) => {
+      stdoutBytes += data.length;
+      if (stdoutBytes <= maxOutputBytes) {
+        stdout += data.toString();
+      } else if (!stdoutTruncated) {
+        const remaining = maxOutputBytes - (stdoutBytes - data.length);
+        if (remaining > 0) stdout += data.toString('utf8', 0, remaining);
+        stdoutTruncated = true;
+      }
     });
 
-    proc.stderr.on('data', (data) => {
-      stderr += data.toString();
+    proc.stderr.on('data', (data: Buffer) => {
+      stderrBytes += data.length;
+      if (stderrBytes <= maxOutputBytes) {
+        stderr += data.toString();
+      } else if (!stderrTruncated) {
+        const remaining = maxOutputBytes - (stderrBytes - data.length);
+        if (remaining > 0) stderr += data.toString('utf8', 0, remaining);
+        stderrTruncated = true;
+      }
     });
 
     if (input.stdin) {
@@ -273,6 +292,13 @@ export async function handleProxyExec(
       for (const name of secretNames) {
         await recordUsage(name);
         await audit.secretUsedExec(name, input.command[0], code ?? -1, duration);
+      }
+
+      if (stdoutTruncated) {
+        stdout += '\n[credential-proxy: stdout truncated at 10 MB]';
+      }
+      if (stderrTruncated) {
+        stderr += '\n[credential-proxy: stderr truncated at 10 MB]';
       }
 
       // Redact any secret values from output

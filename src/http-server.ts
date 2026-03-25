@@ -321,6 +321,11 @@ export function startHttpServer(options: ServerOptions): Promise<void> {
       });
     });
 
+    // Disable request timeout so long-running exec commands aren't killed.
+    // Node 18+ defaults requestTimeout to 300s which is too short.
+    server.requestTimeout = 0;
+    server.headersTimeout = 0;
+
     server.on('error', (error) => {
       reject(error);
     });

@@ -234,12 +234,35 @@ public func handleProxyExec(
     let timeoutMs = input.timeout ?? 30_000
     var timedOut = false
 
-    let processTask = Task {
-        // Read stdout/stderr concurrently before waitUntilExit to avoid pipe deadlocks
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+    // Run blocking pipe reads on a dedicated thread to avoid starving
+    // the Swift cooperative thread pool (which would block the HTTP server
+    // from handling other requests during long-running commands).
+    let maxOutputBytes = 10 * 1024 * 1024  // 10 MB cap per stream
+    let processTask = Task.detached {
+        func readCapped(_ handle: FileHandle, limit: Int) -> (Data, Bool) {
+            var buf = Data()
+            var truncated = false
+            while true {
+                let chunk = handle.availableData
+                if chunk.isEmpty { break }
+                let remaining = limit - buf.count
+                if remaining <= 0 {
+                    truncated = true
+                    continue  // drain pipe to avoid blocking the child
+                }
+                if chunk.count > remaining {
+                    buf.append(chunk.prefix(remaining))
+                    truncated = true
+                } else {
+                    buf.append(chunk)
+                }
+            }
+            return (buf, truncated)
+        }
+        let (stdoutData, stdoutTruncated) = readCapped(stdoutPipe.fileHandleForReading, limit: maxOutputBytes)
+        let (stderrData, stderrTruncated) = readCapped(stderrPipe.fileHandleForReading, limit: maxOutputBytes)
         process.waitUntilExit()
-        return (stdoutData, stderrData)
+        return (stdoutData, stderrData, stdoutTruncated, stderrTruncated)
     }
 
     let timeoutTask = Task {
@@ -248,12 +271,17 @@ public func handleProxyExec(
         return true
     }
 
-    let (stdoutData, stderrData): (Data, Data)
+    let stdoutData: Data
+    let stderrData: Data
+    let stdoutTruncated: Bool
+    let stderrTruncated: Bool
 
     // Race: process completion vs timeout
     let result = await processTask.value
     stdoutData = result.0
     stderrData = result.1
+    stdoutTruncated = result.2
+    stderrTruncated = result.3
     timeoutTask.cancel()
 
     if !timeoutTask.isCancelled {
@@ -273,6 +301,13 @@ public func handleProxyExec(
 
     var stdout = String(data: stdoutData, encoding: .utf8) ?? ""
     var stderr = String(data: stderrData, encoding: .utf8) ?? ""
+
+    if stdoutTruncated {
+        stdout += "\n[credential-proxy: stdout truncated at 10 MB]"
+    }
+    if stderrTruncated {
+        stderr += "\n[credential-proxy: stderr truncated at 10 MB]"
+    }
 
     // Record usage and audit for each secret
     for name in uniqueNames {
