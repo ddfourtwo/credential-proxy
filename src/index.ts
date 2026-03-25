@@ -15,7 +15,20 @@ import type { ListCredentialsInput } from './tools/list-credentials.js';
 import type { ProxyRequestInput } from './tools/proxy-request.js';
 import type { ProxyExecInput } from './tools/proxy-exec.js';
 
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
+
 const APP_URL = process.env.CREDENTIAL_PROXY_APP_URL;
+
+// Log to both stderr and a file (stderr may be silenced by MCP clients)
+const LOG_DIR = join(homedir(), 'Library', 'Application Support', 'credential-proxy', 'logs');
+try { mkdirSync(LOG_DIR, { recursive: true }); } catch { /* ignore */ }
+function mcpLog(msg: string) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  console.error(line.trimEnd());
+  try { appendFileSync(join(LOG_DIR, 'mcp.log'), line); } catch { /* ignore */ }
+}
 
 // Relay mode: forward tool calls to the app's HTTP server.
 // The MCP stdio server never touches secrets — the app handles everything.
@@ -194,10 +207,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 // Start server
 async function main() {
   const transport = new StdioServerTransport();
+
+  const mode = APP_URL ? `relay → ${APP_URL}` : 'local';
+  mcpLog(`starting (${mode}, pid ${process.pid})`);
+
+  process.stdin.on('end', () => {
+    mcpLog('stdin closed — shutting down');
+  });
+
+  process.stdin.on('error', (err) => {
+    mcpLog(`stdin error: ${err.message}`);
+  });
+
+  process.on('SIGTERM', () => mcpLog('received SIGTERM'));
+  process.on('SIGINT', () => mcpLog('received SIGINT'));
+
+  process.on('uncaughtException', (err) => {
+    mcpLog(`uncaught exception: ${err.stack || err.message}`);
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    mcpLog(`unhandled rejection: ${reason}`);
+  });
+
   await server.connect(transport);
+  mcpLog('connected and ready');
 }
 
 main().catch((error) => {
-  console.error('Failed to start server:', error);
+  mcpLog(`failed to start: ${error.stack || error.message || error}`);
   process.exit(1);
 });

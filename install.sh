@@ -10,6 +10,7 @@ APP_NAME="Credential Proxy.app"
 INSTALL_DIR="/Applications"
 APP_PATH="$INSTALL_DIR/$APP_NAME"
 MCP_RELAY_DIR="$APP_PATH/Contents/Resources/mcp-relay"
+APP_PORT=11111
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -19,6 +20,42 @@ RESET='\033[0m'
 info() { echo -e "${DIM}$1${RESET}"; }
 success() { echo -e "${GREEN}✓ $1${RESET}"; }
 error() { echo -e "${RED}✗ $1${RESET}"; exit 1; }
+
+# Register credential-proxy MCP server in a JSON config file.
+# Usage: register_mcp <config_path> <relay_index_path> [extra_fields_json]
+register_mcp() {
+    local config_path="$1"
+    local relay_index="$2"
+    local extra="${3}"
+    : "${extra:="{}"}"
+
+    node - "$config_path" "$relay_index" "$APP_PORT" "$extra" <<'REGISTER_SCRIPT'
+const fs = require('fs');
+const path = require('path');
+const [,, configPath, relayIndex, portStr, extraJson] = process.argv;
+const port = parseInt(portStr, 10);
+const extra = JSON.parse(extraJson);
+
+fs.mkdirSync(path.dirname(configPath), { recursive: true });
+
+let config = {};
+try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch {}
+
+const key = config['mcp-servers'] && !config.mcpServers ? 'mcp-servers' : 'mcpServers';
+if (!config[key]) config[key] = {};
+
+const entry = {
+    ...config[key]['credential-proxy'],
+    command: 'node',
+    args: [relayIndex],
+    env: { CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:' + port },
+    ...extra,
+};
+config[key]['credential-proxy'] = entry;
+
+fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+REGISTER_SCRIPT
+}
 
 # --- Preflight checks ---
 
@@ -112,10 +149,20 @@ cd "$SCRIPT_DIR"
 codesign -s - -f "$APP_PATH/Contents/MacOS/CredentialProxy" 2>/dev/null
 success "App bundle created and signed at $APP_PATH"
 
-# --- Step 4: MCP auto-registration ---
-# The app auto-registers in ~/.claude.json on first launch.
-# No manual configuration needed.
-info "MCP server will auto-register when the app launches"
+# --- Step 4: MCP registration ---
+
+RELAY_INDEX="$MCP_RELAY_DIR/index.js"
+
+# Claude Code (~/.claude.json)
+register_mcp "$HOME/.claude.json" "$RELAY_INDEX"
+
+# Pi MCP adapter (~/.pi/agent/mcp.json) — keep-alive + directTools for causeway
+PI_MCP="$HOME/.pi/agent/mcp.json"
+if [ -d "$HOME/.pi/agent" ] || [ -f "$PI_MCP" ]; then
+    register_mcp "$PI_MCP" "$RELAY_INDEX" '{"lifecycle":"keep-alive","directTools":true}'
+fi
+
+success "MCP server registered"
 
 # --- Step 5: Migrate existing secrets to Keychain ---
 

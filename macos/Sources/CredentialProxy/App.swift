@@ -97,57 +97,95 @@ struct CredentialProxyApp: App {
 
     // MARK: - MCP Auto-Registration
 
-    /// Register credential-proxy as an MCP server in ~/.claude.json if not already present.
-    /// Returns true if registration was performed (first launch).
+    private static let appPort = 11111
+
+    /// Register credential-proxy as an MCP server in config files if not already present.
+    /// Returns true if any registration was performed (first launch or path changed).
     static func registerMCPIfNeeded() -> Bool {
         guard let bundlePath = Bundle.main.resourcePath else { return false }
         let relayIndex = bundlePath + "/mcp-relay/index.js"
 
-        // Verify the relay exists in the bundle
         guard FileManager.default.fileExists(atPath: relayIndex) else {
             NSLog("[MCP] relay not found at \(relayIndex)")
             return false
         }
 
-        let claudeJsonPath = NSHomeDirectory() + "/.claude.json"
-        let serverName = "credential-proxy"
+        let baseEntry: [String: Any] = [
+            "type": "stdio",
+            "command": "node",
+            "args": [relayIndex],
+            "env": ["CREDENTIAL_PROXY_APP_URL": "http://127.0.0.1:\(appPort)"]
+        ]
+
+        var registered = false
+
+        // Claude Code (~/.claude.json)
+        if registerInConfig(
+            path: NSHomeDirectory() + "/.claude.json",
+            relayIndex: relayIndex,
+            entry: baseEntry
+        ) { registered = true }
+
+        // Pi MCP adapter (~/.pi/agent/mcp.json)
+        let piDir = NSHomeDirectory() + "/.pi/agent"
+        let piConfig = piDir + "/mcp.json"
+        if FileManager.default.fileExists(atPath: piDir) || FileManager.default.fileExists(atPath: piConfig) {
+            var piEntry = baseEntry
+            piEntry["lifecycle"] = "keep-alive"
+            piEntry["directTools"] = true
+            if registerInConfig(
+                path: piConfig,
+                relayIndex: relayIndex,
+                entry: piEntry
+            ) { registered = true }
+        }
+
+        return registered
+    }
+
+    /// Register credential-proxy in a single MCP config file.
+    /// Preserves existing keys (like lifecycle) while updating command/args/env.
+    private static func registerInConfig(path: String, relayIndex: String, entry: [String: Any]) -> Bool {
+        // Ensure parent directory exists
+        let dir = (path as NSString).deletingLastPathComponent
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
 
         var config: [String: Any]
-        if let data = FileManager.default.contents(atPath: claudeJsonPath),
+        if let data = FileManager.default.contents(atPath: path),
            let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             config = parsed
         } else {
             config = [:]
         }
 
-        var mcpServers = config["mcpServers"] as? [String: Any] ?? [:]
+        let key = config["mcp-servers"] != nil && config["mcpServers"] == nil ? "mcp-servers" : "mcpServers"
+        var mcpServers = config[key] as? [String: Any] ?? [:]
 
-        // Already registered — check if path is current
-        if let existing = mcpServers[serverName] as? [String: Any],
-           let args = existing["args"] as? [String],
-           args.first == relayIndex {
+        // Already registered with correct path and port — skip
+        if let existing = mcpServers["credential-proxy"] as? [String: Any],
+           let args = existing["args"] as? [String], args.first == relayIndex,
+           let env = existing["env"] as? [String: String],
+           env["CREDENTIAL_PROXY_APP_URL"]?.contains("\(appPort)") == true {
             return false
         }
 
-        mcpServers[serverName] = [
-            "type": "stdio",
-            "command": "node",
-            "args": [relayIndex],
-            "env": ["CREDENTIAL_PROXY_APP_URL": "http://127.0.0.1:11111"]
-        ] as [String: Any]
+        // Merge: preserve existing fields (lifecycle, directTools), update command/args/env
+        var merged = mcpServers["credential-proxy"] as? [String: Any] ?? [:]
+        for (k, v) in entry { merged[k] = v }
+        mcpServers["credential-proxy"] = merged
 
-        config["mcpServers"] = mcpServers
+        config[key] = mcpServers
 
         guard let jsonData = try? JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys]) else {
             return false
         }
 
         do {
-            try jsonData.write(to: URL(fileURLWithPath: claudeJsonPath), options: .atomic)
-            NSLog("[MCP] registered credential-proxy in \(claudeJsonPath)")
+            try jsonData.write(to: URL(fileURLWithPath: path), options: .atomic)
+            NSLog("[MCP] registered credential-proxy in \(path)")
             return true
         } catch {
-            NSLog("[MCP] failed to write \(claudeJsonPath): \(error)")
+            NSLog("[MCP] failed to write \(path): \(error)")
             return false
         }
     }

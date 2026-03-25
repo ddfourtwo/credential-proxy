@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_NAME="Credential Proxy.app"
 APP_PATH="/Applications/$APP_NAME"
 MCP_RELAY_DIR="$APP_PATH/Contents/Resources/mcp-relay"
+APP_PORT=11111
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -16,6 +17,42 @@ RESET='\033[0m'
 info() { echo -e "${DIM}$1${RESET}"; }
 success() { echo -e "${GREEN}✓ $1${RESET}"; }
 error() { echo -e "${RED}✗ $1${RESET}"; exit 1; }
+
+# Register credential-proxy MCP server in a JSON config file.
+# Usage: register_mcp <config_path> <relay_index_path> [extra_fields_json]
+register_mcp() {
+    local config_path="$1"
+    local relay_index="$2"
+    local extra="${3}"
+    : "${extra:="{}"}"
+
+    node - "$config_path" "$relay_index" "$APP_PORT" "$extra" <<'REGISTER_SCRIPT'
+const fs = require('fs');
+const path = require('path');
+const [,, configPath, relayIndex, portStr, extraJson] = process.argv;
+const port = parseInt(portStr, 10);
+const extra = JSON.parse(extraJson);
+
+fs.mkdirSync(path.dirname(configPath), { recursive: true });
+
+let config = {};
+try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch {}
+
+const key = config['mcp-servers'] && !config.mcpServers ? 'mcp-servers' : 'mcpServers';
+if (!config[key]) config[key] = {};
+
+const entry = {
+    ...config[key]['credential-proxy'],
+    command: 'node',
+    args: [relayIndex],
+    env: { CREDENTIAL_PROXY_APP_URL: 'http://127.0.0.1:' + port },
+    ...extra,
+};
+config[key]['credential-proxy'] = entry;
+
+fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+REGISTER_SCRIPT
+}
 
 # --- Preflight ---
 
@@ -72,6 +109,19 @@ cd "$MCP_RELAY_DIR"
 npm ci --omit=dev --silent 2>/dev/null
 cd "$SCRIPT_DIR"
 success "MCP relay updated"
+
+# --- Fix MCP configs ---
+
+RELAY_INDEX="$MCP_RELAY_DIR/index.js"
+
+register_mcp "$HOME/.claude.json" "$RELAY_INDEX"
+
+PI_MCP="$HOME/.pi/agent/mcp.json"
+if [ -d "$HOME/.pi/agent" ] || [ -f "$PI_MCP" ]; then
+    register_mcp "$PI_MCP" "$RELAY_INDEX" '{"lifecycle":"keep-alive","directTools":true}'
+fi
+
+success "MCP configs updated"
 
 # --- Relaunch ---
 
