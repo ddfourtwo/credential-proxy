@@ -23,8 +23,7 @@ error() { echo -e "${RED}✗ $1${RESET}"; exit 1; }
 register_mcp() {
     local config_path="$1"
     local relay_index="$2"
-    local extra="${3}"
-    : "${extra:="{}"}"
+    local extra="${3:-"{}"}"
 
     node - "$config_path" "$relay_index" "$APP_PORT" "$extra" <<'REGISTER_SCRIPT'
 const fs = require('fs');
@@ -77,24 +76,36 @@ info "Pulling latest changes..."
 git pull
 success "Pulled latest"
 
-# --- Verify pre-built binary ---
-
-PREBUILT_BIN="$SCRIPT_DIR/macos/bin/CredentialProxy"
-if [ ! -f "$PREBUILT_BIN" ]; then
-    error "Pre-built binary not found at $PREBUILT_BIN"
-fi
-
 # --- Build MCP relay ---
 
 info "Building MCP relay..."
 npm run build --silent 2>/dev/null
 success "MCP relay built"
 
-# --- Replace binary ---
+# --- Build Swift binary from source ---
 
-cp "$PREBUILT_BIN" "$APP_PATH/Contents/MacOS/CredentialProxy"
-codesign -s - -f "$APP_PATH/Contents/MacOS/CredentialProxy" 2>/dev/null
-success "Binary updated"
+info "Building Swift binary..."
+cd "$SCRIPT_DIR/macos"
+if swift build -c release 2>&1 | tail -1; then
+    BUILT_BIN="$SCRIPT_DIR/macos/.build/release/CredentialProxy"
+    /bin/cp -f "$BUILT_BIN" "$APP_PATH/Contents/MacOS/CredentialProxy"
+    codesign -s - -f "$APP_PATH/Contents/MacOS/CredentialProxy" 2>/dev/null
+    # Also update the pre-built binary for install.sh
+    /bin/cp -f "$BUILT_BIN" "$SCRIPT_DIR/macos/bin/CredentialProxy" 2>/dev/null || true
+    success "Binary built and updated"
+else
+    # Fall back to pre-built binary if Swift build fails (e.g. no Xcode)
+    PREBUILT_BIN="$SCRIPT_DIR/macos/bin/CredentialProxy"
+    if [ -f "$PREBUILT_BIN" ]; then
+        /bin/cp -f "$PREBUILT_BIN" "$APP_PATH/Contents/MacOS/CredentialProxy"
+        codesign -s - -f "$APP_PATH/Contents/MacOS/CredentialProxy" 2>/dev/null
+        echo -e "${DIM}Swift build failed — used pre-built binary instead${RESET}"
+        success "Binary updated (pre-built fallback)"
+    else
+        error "Swift build failed and no pre-built binary found at $PREBUILT_BIN"
+    fi
+fi
+cd "$SCRIPT_DIR"
 
 # --- Update MCP relay ---
 
