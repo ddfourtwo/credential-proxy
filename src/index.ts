@@ -30,6 +30,17 @@ function mcpLog(msg: string) {
   try { appendFileSync(join(LOG_DIR, 'mcp.log'), line); } catch { /* ignore */ }
 }
 
+// Detect if we're running from the app bundle — if so, relay mode is required.
+// Local mode only makes sense when running from the source repo (dev/test).
+const IS_APP_BUNDLE = import.meta.url?.includes('/Credential Proxy.app/') ||
+  process.argv[1]?.includes('/Credential Proxy.app/');
+if (IS_APP_BUNDLE && !APP_URL) {
+  mcpLog('FATAL: running from app bundle but CREDENTIAL_PROXY_APP_URL is not set. ' +
+    'The MCP config is broken — env.CREDENTIAL_PROXY_APP_URL must be set to http://127.0.0.1:11111. ' +
+    'Re-run install.sh or update.sh to fix.');
+  process.exit(1);
+}
+
 // Relay mode: forward tool calls to the app's HTTP server.
 // The MCP stdio server never touches secrets — the app handles everything.
 async function relayToApp(
