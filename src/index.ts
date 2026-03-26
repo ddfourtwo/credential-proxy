@@ -19,7 +19,13 @@ import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
-const APP_URL = process.env.CREDENTIAL_PROXY_APP_URL;
+// When running from the app bundle, always relay to the app's HTTP server.
+// The env var is a fallback for dev/test — the app bundle auto-detects.
+const DEFAULT_APP_PORT = 11111;
+const IS_APP_BUNDLE = import.meta.url?.includes('/Credential Proxy.app/') ||
+  process.argv[1]?.includes('/Credential Proxy.app/');
+const APP_URL = process.env.CREDENTIAL_PROXY_APP_URL ||
+  (IS_APP_BUNDLE ? `http://127.0.0.1:${DEFAULT_APP_PORT}` : undefined);
 
 // Log to both stderr and a file (stderr may be silenced by MCP clients)
 const LOG_DIR = join(homedir(), 'Library', 'Application Support', 'credential-proxy', 'logs');
@@ -28,17 +34,6 @@ function mcpLog(msg: string) {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
   console.error(line.trimEnd());
   try { appendFileSync(join(LOG_DIR, 'mcp.log'), line); } catch { /* ignore */ }
-}
-
-// Detect if we're running from the app bundle — if so, relay mode is required.
-// Local mode only makes sense when running from the source repo (dev/test).
-const IS_APP_BUNDLE = import.meta.url?.includes('/Credential Proxy.app/') ||
-  process.argv[1]?.includes('/Credential Proxy.app/');
-if (IS_APP_BUNDLE && !APP_URL) {
-  mcpLog('FATAL: running from app bundle but CREDENTIAL_PROXY_APP_URL is not set. ' +
-    'The MCP config is broken — env.CREDENTIAL_PROXY_APP_URL must be set to http://127.0.0.1:11111. ' +
-    'Re-run install.sh or update.sh to fix.');
-  process.exit(1);
 }
 
 // Relay mode: forward tool calls to the app's HTTP server.
