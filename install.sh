@@ -26,7 +26,7 @@ error() { echo -e "${RED}✗ $1${RESET}"; exit 1; }
 register_mcp() {
     local config_path="$1"
     local relay_index="$2"
-    local extra="${3}"
+    local extra="${3:-}"
     : "${extra:="{}"}"
 
     node - "$config_path" "$relay_index" "$APP_PORT" "$extra" <<'REGISTER_SCRIPT'
