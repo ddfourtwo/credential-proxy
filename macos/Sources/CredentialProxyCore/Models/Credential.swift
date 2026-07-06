@@ -21,6 +21,9 @@ public struct Credential: Identifiable, Codable {
         allowedPlacements.joined(separator: ", ")
     }
 
+    // ISO8601 strings sort chronologically; "" (Never) sorts first ascending.
+    public var lastUsedSort: String { lastUsed ?? "" }
+
     public var lastUsedDisplay: String {
         guard let lastUsed else { return "Never" }
         let formatter = ISO8601DateFormatter()

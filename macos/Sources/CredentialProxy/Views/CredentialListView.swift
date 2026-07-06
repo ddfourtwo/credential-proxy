@@ -12,6 +12,7 @@ struct CredentialListView: View {
     @State private var errorMessage: String?
     @State private var isLoading = false
     @State private var revealedSecret: RevealedSecret?
+    @State private var sortOrder = [KeyPathComparator(\Credential.name)]
 
     private struct RevealedSecret: Identifiable {
         let id = UUID()
@@ -77,14 +78,14 @@ struct CredentialListView: View {
                 }
                 Spacer()
             } else {
-                Table(credentials) {
-                    TableColumn("Name") { cred in
+                Table(credentials, sortOrder: $sortOrder) {
+                    TableColumn("Name", value: \.name) { cred in
                         Text(cred.name)
                             .font(.system(.body, design: .monospaced))
                     }
                     .width(min: 120, ideal: 160)
 
-                    TableColumn("Source") { cred in
+                    TableColumn("Source", value: \.sourceType) { cred in
                         Label(
                             cred.sourceType == "1password" ? "1Password" : "Encrypted",
                             systemImage: cred.sourceType == "1password" ? "lock.shield" : "lock.fill"
@@ -93,26 +94,26 @@ struct CredentialListView: View {
                     }
                     .width(min: 80, ideal: 100)
 
-                    TableColumn("Domains") { cred in
+                    TableColumn("Domains", value: \.domainsDisplay) { cred in
                         Text(cred.domainsDisplay)
                             .font(.caption)
                             .lineLimit(1)
                     }
                     .width(min: 120, ideal: 200)
 
-                    TableColumn("Placements") { cred in
+                    TableColumn("Placements", value: \.placementsDisplay) { cred in
                         Text(cred.placementsDisplay)
                             .font(.caption)
                     }
                     .width(min: 80, ideal: 100)
 
-                    TableColumn("Uses") { cred in
+                    TableColumn("Uses", value: \.usageCount) { cred in
                         Text("\(cred.usageCount)")
                             .font(.system(.caption, design: .monospaced))
                     }
                     .width(40)
 
-                    TableColumn("Last Used") { cred in
+                    TableColumn("Last Used", value: \.lastUsedSort) { cred in
                         Text(cred.lastUsedDisplay)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -184,6 +185,9 @@ struct CredentialListView: View {
         .sheet(item: $revealedSecret) { secret in
             RevealSecretView(name: secret.name, value: secret.value)
         }
+        .onChange(of: sortOrder) { newOrder in
+            credentials.sort(using: newOrder)
+        }
         .task(id: serverManager.isRunning) {
             if serverManager.isRunning {
                 await loadCredentials()
@@ -225,7 +229,7 @@ struct CredentialListView: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            credentials = try await apiClient.listCredentials()
+            credentials = try await apiClient.listCredentials().sorted(using: sortOrder)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
