@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { handleProxyRequest } from '../../tools/proxy-request.js';
+import { cliHandleProxyRequest } from '../../cli/app-client.js';
 import { colors } from '../utils.js';
 
 export const proxyRequestCommand = new Command('proxy-request')
@@ -23,7 +23,7 @@ export const proxyRequestCommand = new Command('proxy-request')
     }
 
     const method = options.method.toUpperCase() as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-    const result = await handleProxyRequest({
+    const result = await cliHandleProxyRequest({
       method,
       url,
       headers: Object.keys(headers).length > 0 ? headers : undefined,

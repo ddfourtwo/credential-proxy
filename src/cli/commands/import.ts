@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { addSecret, secretExists } from '../../storage/secrets-store.js';
+import { cliSecretExists, cliAddSecret } from '../../cli/app-client.js';
 import type { SecretPlacement } from '../../storage/types.js';
 
 interface ExportedSecret {
@@ -79,7 +79,7 @@ export const importCommand = new Command('import')
           continue;
         }
 
-        const exists = await secretExists(secret.name);
+        const exists = await cliSecretExists(secret.name);
         
         if (exists && !options.overwrite) {
           console.log(`⏭️  Skipping ${secret.name} (already exists, use --overwrite to replace)`);
@@ -97,7 +97,7 @@ export const importCommand = new Command('import')
         } else {
           const placements = (secret.allowedPlacements || ['header']) as SecretPlacement[];
           try {
-            await addSecret(secret.name, secret.value, secret.allowedDomains, placements, secret.allowedCommands);
+            await cliAddSecret(secret.name, secret.value, secret.allowedDomains, placements, secret.allowedCommands);
             
             if (exists) {
               console.log(`🔄 Overwritten: ${secret.name}`);

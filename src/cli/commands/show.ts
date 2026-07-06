@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { getSecret, secretExists } from '../../storage/secrets-store.js';
+import { cliSecretExists, cliGetSecret } from '../../cli/app-client.js';
 import { colors } from '../utils.js';
 
 export const showCommand = new Command('show')
@@ -7,13 +7,13 @@ export const showCommand = new Command('show')
   .argument('<name>', 'Secret name to reveal')
   .action(async (name: string) => {
     try {
-      if (!await secretExists(name)) {
+      if (!await cliSecretExists(name)) {
         console.error(colors.red(`Error: Secret "${name}" not found`));
         console.log(colors.dim('Use "credential-proxy list" to see available secrets.'));
         process.exit(1);
       }
 
-      const value = await getSecret(name);
+      const value = await cliGetSecret(name);
       if (!value) {
         console.error(colors.red(`Error: Could not decrypt secret "${name}"`));
         process.exit(1);

@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { rotateSecret, secretExists } from '../../storage/secrets-store.js';
+import { cliSecretExists, cliRotateSecret } from '../../cli/app-client.js';
 import { audit } from '../../utils/audit-logger.js';
 import { promptPassword, colors } from '../utils.js';
 
@@ -8,7 +8,7 @@ export const rotateCommand = new Command('rotate')
   .argument('<name>', 'Secret name to rotate')
   .action(async (name: string) => {
     try {
-      if (!(await secretExists(name))) {
+      if (!(await cliSecretExists(name))) {
         console.error(colors.red(`Secret ${name} not found`));
         process.exit(1);
       }
@@ -25,7 +25,7 @@ export const rotateCommand = new Command('rotate')
         process.exit(1);
       }
 
-      const result = await rotateSecret(name, newValue);
+      const result = await cliRotateSecret(name, newValue);
       if (!result) {
         console.error(colors.red(`Failed to rotate secret ${name}`));
         process.exit(1);

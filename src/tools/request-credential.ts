@@ -9,7 +9,7 @@ export interface RequestCredentialInput {
 export const requestCredentialTool = {
   name: 'request_credential',
   description:
-    'Request the user to add a credential via the macOS UI. The user will see a window where they can paste the secret value. Use this when you need a credential that is not yet configured. If a credential with the same name already exists, the request will be denied unless overwrite is set to true.',
+    'Request the user to add a credential via the macOS UI. The user will see a window where they can paste the secret value. This call BLOCKS until the user saves or cancels, then returns the outcome — do not end your turn or tell the user to paste separately; just await the result and continue. A success result means the credential is already stored and ready to use. Use this when you need a credential that is not yet configured. If a credential with the same name already exists, the request will be denied unless overwrite is set to true.',
   inputSchema: {
     type: 'object' as const,
     properties: {

@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { addSecret, addSecretFrom1Password, secretExists } from '../../storage/secrets-store.js';
+import { cliSecretExists, cliAddSecret } from '../../cli/app-client.js';
 import { audit } from '../../utils/audit-logger.js';
 import { promptPassword, confirm, colors } from '../utils.js';
 import type { SecretPlacement } from '../../storage/types.js';
@@ -21,7 +21,7 @@ export const addCommand = new Command('add')
   }) => {
     try {
       // Check if already exists
-      if (await secretExists(name)) {
+      if (await cliSecretExists(name)) {
         const overwrite = await confirm(`Secret ${name} already exists. Overwrite?`);
         if (!overwrite) {
           console.log('Aborted.');
@@ -48,13 +48,13 @@ export const addCommand = new Command('add')
       
       if (opRef) {
         // Add from 1Password
-        const result = await addSecretFrom1Password(name, opRef, domains, placements, commands);
+        const result = await cliAddSecret(name, opRef, domains, placements, commands);
         
         await audit.secretAdded(name, domains, placements);
         
         console.log(colors.green(`✓ Secret ${name} ${result.overwritten ? 'updated' : 'added'} (1Password)`));
         console.log(`  1Password ref: ${opRef}`);
-        console.log(`  Verified: ${result.verified ? colors.green('yes') : colors.yellow('no (check op CLI auth)')}`);
+        console.log(`  Verified: ${colors.yellow('no (check op CLI auth)')}`);
         console.log(`  Allowed domains: ${domains.join(', ')}`);
         console.log(`  Allowed placements: ${placements.join(', ')}`);
         if (commands && commands.length > 0) {
@@ -75,7 +75,7 @@ export const addCommand = new Command('add')
         }
 
         // Add the secret
-        const result = await addSecret(name, value, domains, placements, commands);
+        const result = await cliAddSecret(name, value, domains, placements, commands);
 
         // Audit log
         await audit.secretAdded(name, domains, placements);

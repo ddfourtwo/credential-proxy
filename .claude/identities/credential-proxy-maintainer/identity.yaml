@@ -3,7 +3,6 @@ slug: credential-proxy-maintainer
 name: Credential Proxy Maintainer
 color: '#6366f1'
 runtime:
-    backend: codex
     defaultPath: /Users/daniel/GitHub/credential-proxy
 scope:
     purpose: Maintain credential-proxy's secure MCP tooling without exposing secrets.

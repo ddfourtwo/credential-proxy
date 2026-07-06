@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { removeSecret, secretExists } from '../../storage/secrets-store.js';
+import { cliSecretExists, cliRemoveSecret } from '../../cli/app-client.js';
 import { audit } from '../../utils/audit-logger.js';
 import { confirm, colors } from '../utils.js';
 
@@ -8,7 +8,7 @@ export const removeCommand = new Command('remove')
   .argument('<name>', 'Secret name to remove')
   .action(async (name: string) => {
     try {
-      if (!(await secretExists(name))) {
+      if (!(await cliSecretExists(name))) {
         console.error(colors.red(`Secret ${name} not found`));
         process.exit(1);
       }
@@ -19,7 +19,7 @@ export const removeCommand = new Command('remove')
         return;
       }
 
-      await removeSecret(name);
+      await cliRemoveSecret(name);
       await audit.secretRemoved(name);
 
       console.log(colors.green(`✓ Secret ${name} removed`));

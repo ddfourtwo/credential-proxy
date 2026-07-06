@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { listSecrets } from '../../storage/secrets-store.js';
+import { cliListSecrets } from '../../cli/app-client.js';
 import { formatTable, formatRelativeTime, colors } from '../utils.js';
 
 export const listCommand = new Command('list')
@@ -7,7 +7,7 @@ export const listCommand = new Command('list')
   .option('--json', 'Output as JSON')
   .action(async (options: { json?: boolean }) => {
     try {
-      const secrets = await listSecrets();
+      const secrets = await cliListSecrets();
 
       if (secrets.length === 0) {
         console.log('No secrets configured.');

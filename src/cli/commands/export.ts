@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { writeFile } from 'node:fs/promises';
-import { listSecrets, getSecret } from '../../storage/secrets-store.js';
+import { cliListSecrets, cliGetSecret } from '../../cli/app-client.js';
 
 interface ExportedSecret {
   name: string;
@@ -26,7 +26,7 @@ export const exportCommand = new Command('export')
       process.exit(1);
     }
     try {
-      const secrets = await listSecrets();
+      const secrets = await cliListSecrets();
       
       if (secrets.length === 0) {
         console.log('No secrets to export.');
@@ -36,7 +36,7 @@ export const exportCommand = new Command('export')
       const exportedSecrets: ExportedSecret[] = [];
 
       for (const secret of secrets) {
-        const value = await getSecret(secret.name);
+        const value = await cliGetSecret(secret.name);
         if (value) {
           exportedSecrets.push({
             name: secret.name,

@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { getSecretMetadata, getSecret } from '../../storage/secrets-store.js';
+import { cliGetSecretMetadata, cliGetSecret } from '../../cli/app-client.js';
 import { colors } from '../utils.js';
 
 export const testCommand = new Command('test')
@@ -7,7 +7,7 @@ export const testCommand = new Command('test')
   .argument('<name>', 'Secret name to test')
   .action(async (name: string) => {
     try {
-      const metadata = await getSecretMetadata(name);
+      const metadata = await cliGetSecretMetadata(name);
 
       if (!metadata) {
         console.error(colors.red(`✗ Secret ${name} not found`));
@@ -17,7 +17,7 @@ export const testCommand = new Command('test')
       console.log(`Testing ${name}...`);
 
       // Test 1: Secret exists and is accessible
-      const value = await getSecret(name);
+      const value = await cliGetSecret(name);
       if (value) {
         console.log(colors.green('✓ Secret is configured and accessible'));
       } else {

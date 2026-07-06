@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { handleProxyExec } from '../../tools/proxy-exec.js';
+import { cliHandleProxyExec } from '../../cli/app-client.js';
 import { colors } from '../utils.js';
 
 export const proxyExecCommand = new Command('proxy-exec')
@@ -22,7 +22,7 @@ export const proxyExecCommand = new Command('proxy-exec')
       }
     }
 
-    const result = await handleProxyExec({
+    const result = await cliHandleProxyExec({
       command: cmd,
       env: Object.keys(env).length > 0 ? env : undefined,
       cwd: options.cwd,

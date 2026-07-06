@@ -19,13 +19,7 @@ import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
-// When running from the app bundle, always relay to the app's HTTP server.
-// The env var is a fallback for dev/test — the app bundle auto-detects.
-const DEFAULT_APP_PORT = 11111;
-const IS_APP_BUNDLE = import.meta.url?.includes('/Credential Proxy.app/') ||
-  process.argv[1]?.includes('/Credential Proxy.app/');
-const APP_URL = process.env.CREDENTIAL_PROXY_APP_URL ||
-  (IS_APP_BUNDLE ? `http://127.0.0.1:${DEFAULT_APP_PORT}` : undefined);
+import { detectAppUrl, relayToApp, getConfiguredAppUrl } from './app-client.js';
 
 // Log to both stderr and a file (stderr may be silenced by MCP clients)
 const LOG_DIR = join(homedir(), 'Library', 'Application Support', 'credential-proxy', 'logs');
@@ -36,61 +30,6 @@ function mcpLog(msg: string) {
   try { appendFileSync(join(LOG_DIR, 'mcp.log'), line); } catch { /* ignore */ }
 }
 
-// Relay mode: forward tool calls to the app's HTTP server.
-// The MCP stdio server never touches secrets — the app handles everything.
-async function relayToApp(
-  endpoint: string,
-  method: string,
-  body?: unknown,
-  queryParams?: Record<string, string>,
-  timeoutMs?: number
-): Promise<unknown> {
-  const url = new URL(endpoint, APP_URL);
-  if (queryParams) {
-    for (const [k, v] of Object.entries(queryParams)) {
-      if (v !== undefined) url.searchParams.set(k, v);
-    }
-  }
-
-  const opts: RequestInit = {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-  };
-  if (body && method !== 'GET') {
-    opts.body = JSON.stringify(body);
-  }
-
-  // For long-running requests (e.g. proxy_exec), set fetch timeout to match.
-  // Default 30s for normal requests; exec passes its own timeout + buffer.
-  if (timeoutMs) {
-    opts.signal = AbortSignal.timeout(timeoutMs);
-  }
-
-  const maxRetries = 3;
-  const baseDelay = 500; // ms
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const res = await fetch(url.toString(), opts);
-      const text = await res.text();
-      try {
-        return JSON.parse(text);
-      } catch {
-        throw new Error(`App server returned ${res.status}: ${text.slice(0, 200)}`);
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      const isConnectionError = msg.includes('fetch failed') || msg.includes('ECONNREFUSED');
-      if (!isConnectionError || attempt === maxRetries) {
-        throw error;
-      }
-      // Server may be starting up after unlock — wait and retry
-      await new Promise(resolve => setTimeout(resolve, baseDelay * (attempt + 1)));
-    }
-  }
-
-  throw new Error('Unreachable');
-}
 
 const server = new Server(
   {
@@ -114,11 +53,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 // Handle tool calls
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
+  const appUrl = await detectAppUrl();
 
   try {
     let result: unknown;
 
-    if (APP_URL) {
+    if (appUrl) {
       // Relay mode: forward to app HTTP server
       switch (name) {
         case 'list_credentials':
@@ -143,14 +83,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case 'request_credential': {
           const reqArgs = args as unknown as RequestCredentialInput;
           // Check if credential already exists before prompting the user
-          const existing = await relayToApp('/credentials', 'GET') as { secrets?: Array<{ name: string }> };
-          if (existing?.secrets?.some(s => s.name === reqArgs.name) && !reqArgs.overwrite) {
+          const existing = await relayToApp('/credentials', 'GET') as { credentials?: Array<{ name: string }>; secrets?: Array<{ name: string }> };
+          const items = existing?.credentials ?? existing?.secrets ?? [];
+          if (items.some(s => s.name === reqArgs.name) && !reqArgs.overwrite) {
             return {
               content: [{ type: 'text' as const, text: `Credential '${reqArgs.name}' already exists. If you intend to replace it, call request_credential again with overwrite: true. Please confirm with the user first.` }],
               isError: true,
             };
           }
-          result = await relayToApp('/request-credential', 'POST', args);
+          const reqResult = await relayToApp('/request-credential', 'POST', args) as { success?: boolean; cancelled?: boolean };
+          if (reqResult?.success) {
+            return {
+              content: [{ type: 'text' as const, text: `Credential '${reqArgs.name}' was saved by the user and is now stored and ready to use. Continue with your task — do not ask the user to paste anything; they already did.` }],
+            };
+          }
+          if (reqResult?.cancelled) {
+            return {
+              content: [{ type: 'text' as const, text: `The user cancelled the request; credential '${reqArgs.name}' was NOT saved. Do not retry without asking the user first.` }],
+              isError: true,
+            };
+          }
+          result = reqResult;
           break;
         }
         default:
@@ -195,12 +148,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const isConnectionError = msg.includes('fetch failed') || msg.includes('ECONNREFUSED');
     const isTimeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
 
-    if (isTimeout && APP_URL) {
+    if (isTimeout && appUrl) {
       return {
         content: [
           {
             type: 'text' as const,
-            text: `The command timed out waiting for Credential Proxy at ${APP_URL}. ` +
+            text: `The command timed out waiting for Credential Proxy at ${appUrl}. ` +
               'The command may still be running on the server. ' +
               'Consider increasing the timeout parameter for long-running commands.',
           },
@@ -209,12 +162,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
 
-    if (isConnectionError && APP_URL) {
+    if (isConnectionError && appUrl) {
       return {
         content: [
           {
             type: 'text' as const,
-            text: `Credential Proxy is not responding at ${APP_URL} (retried 3 times). Possible causes:\n` +
+            text: `Credential Proxy is not responding at ${appUrl} (retried 3 times). Possible causes:\n` +
               '1. The macOS app is locked — click the key icon in the menu bar and enter your PIN\n' +
               '2. The app was just unlocked — the server may still be starting, try again in a few seconds\n' +
               '3. The app is not running — launch Credential Proxy from Applications',
@@ -240,7 +193,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
 
-  const mode = APP_URL ? `relay → ${APP_URL}` : 'local';
+  const configuredAppUrl = getConfiguredAppUrl();
+  const mode = configuredAppUrl ? `relay → ${configuredAppUrl}` : 'local';
   mcpLog(`starting (${mode}, pid ${process.pid})`);
 
   process.stdin.on('end', () => {
