@@ -12,6 +12,7 @@ import { exportCommand } from './commands/export.js';
 import { importCommand } from './commands/import.js';
 import { proxyRequestCommand } from './commands/proxy-request.js';
 import { proxyExecCommand } from './commands/proxy-exec.js';
+import { execEnvCommand } from './commands/exec-env.js';
 
 const program = new Command();
 
@@ -33,5 +34,6 @@ program.addCommand(exportCommand);
 program.addCommand(importCommand);
 program.addCommand(proxyRequestCommand);
 program.addCommand(proxyExecCommand);
+program.addCommand(execEnvCommand);
 
 program.parse();
