@@ -56,6 +56,16 @@ public class Router {
     }
 
     private func matches(routeSegments: [String], requestSegments: [String]) -> Bool {
+        // Trailing "*" matches the remainder of the path (>= 0 segments), captured as params["*"].
+        if routeSegments.last == "*" {
+            let prefix = routeSegments.dropLast()
+            guard requestSegments.count >= prefix.count else { return false }
+            for (route, request) in zip(prefix, requestSegments) {
+                if route.hasPrefix(":") { continue }
+                if route != request { return false }
+            }
+            return true
+        }
         guard routeSegments.count == requestSegments.count else { return false }
         for (route, request) in zip(routeSegments, requestSegments) {
             if route.hasPrefix(":") { continue }
@@ -66,11 +76,16 @@ public class Router {
 
     private func extractParams(routeSegments: [String], requestSegments: [String]) -> [String: String] {
         var params: [String: String] = [:]
-        for (route, request) in zip(routeSegments, requestSegments) {
+        let hasTail = routeSegments.last == "*"
+        let named = hasTail ? Array(routeSegments.dropLast()) : routeSegments
+        for (route, request) in zip(named, requestSegments) {
             if route.hasPrefix(":") {
                 let paramName = String(route.dropFirst())
                 params[paramName] = request
             }
+        }
+        if hasTail {
+            params["*"] = requestSegments.dropFirst(named.count).joined(separator: "/")
         }
         return params
     }

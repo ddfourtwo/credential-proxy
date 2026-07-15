@@ -34,7 +34,7 @@ export interface ProxyExecError {
 
 export const proxyExecTool = {
   name: 'proxy_exec',
-  description: 'Execute a command with secure credential substitution. Use {{SECRET_NAME}} placeholders in command arguments or environment variables. The secret value is never exposed to you - it is substituted on the server side and redacted from output.',
+  description: 'Execute a command with secure credential substitution. Use {{SECRET_NAME}} placeholders in command arguments or environment variables; the value is substituted on the server side. The secret must have an explicit command allowlist (e.g. ["git *"]) — commands outside it are refused. Raw secret values are redacted from output on a best-effort basis, so keep the allowlist tight: an allowed program that can run arbitrary code (sh, python, node) can still leak the value.',
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -140,22 +140,33 @@ async function validatePlaceholder(
     };
   }
 
-  // Check if command is allowed (if restrictions exist)
-  if (metadata.allowedCommands && metadata.allowedCommands.length > 0) {
-    const allowed = metadata.allowedCommands.some(pattern => 
-      commandMatchesPattern(command, pattern)
-    );
-    
-    if (!allowed) {
-      await audit.secretBlocked(placeholder.name, command.join(' '), 'COMMAND_NOT_ALLOWED');
-      return {
-        error: 'SECRET_COMMAND_BLOCKED',
-        message: `Secret '${placeholder.name}' cannot be used with command '${command[0]}'`,
-        secret: placeholder.name,
-        requestedCommand: command.join(' '),
-        allowedCommands: metadata.allowedCommands
-      };
-    }
+  // A secret used in exec MUST declare an explicit command allowlist. Without one,
+  // the agent could run any command (e.g. `sh -c 'echo {{SECRET}} | base64'`) and
+  // exfiltrate the value in an encoded form that output redaction cannot catch.
+  if (!metadata.allowedCommands || metadata.allowedCommands.length === 0) {
+    await audit.secretBlocked(placeholder.name, command[0], 'COMMAND_NOT_ALLOWED');
+    return {
+      error: 'SECRET_COMMAND_BLOCKED',
+      message: `Secret '${placeholder.name}' has no command allowlist and cannot be used in proxy_exec. Add allowed command patterns (e.g. ["git *"]) via update_credential first.`,
+      secret: placeholder.name,
+      requestedCommand: command.join(' '),
+      allowedCommands: []
+    };
+  }
+
+  const allowed = metadata.allowedCommands.some(pattern =>
+    commandMatchesPattern(command, pattern)
+  );
+
+  if (!allowed) {
+    await audit.secretBlocked(placeholder.name, command.join(' '), 'COMMAND_NOT_ALLOWED');
+    return {
+      error: 'SECRET_COMMAND_BLOCKED',
+      message: `Secret '${placeholder.name}' cannot be used with command '${command[0]}'`,
+      secret: placeholder.name,
+      requestedCommand: command.join(' '),
+      allowedCommands: metadata.allowedCommands
+    };
   }
 
   return null;

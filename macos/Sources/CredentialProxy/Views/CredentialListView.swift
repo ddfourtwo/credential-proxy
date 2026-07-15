@@ -1,5 +1,4 @@
 import SwiftUI
-import LocalAuthentication
 import CredentialProxyCore
 
 struct CredentialListView: View {
@@ -196,31 +195,14 @@ struct CredentialListView: View {
     }
 
     private func revealSecret(_ credential: Credential) {
-        let context = LAContext()
-        context.localizedReason = "reveal credential"
-
-        var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
-            errorMessage = "Authentication not available: \(error?.localizedDescription ?? "unknown")"
-            return
-        }
-
-        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Reveal \"\(credential.name)\"") { success, authError in
-            DispatchQueue.main.async {
-                if success {
-                    Task {
-                        do {
-                            let value = try await apiClient.revealCredential(name: credential.name)
-                            revealedSecret = RevealedSecret(name: credential.name, value: value)
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
-                    }
-                } else if let authError {
-                    if (authError as NSError).code != LAError.userCancel.rawValue {
-                        errorMessage = authError.localizedDescription
-                    }
-                }
+        // Device authentication is enforced server-side by the /reveal endpoint,
+        // so the prompt fires there for every caller. Just request the value.
+        Task {
+            do {
+                let value = try await apiClient.revealCredential(name: credential.name)
+                revealedSecret = RevealedSecret(name: credential.name, value: value)
+            } catch {
+                errorMessage = error.localizedDescription
             }
         }
     }

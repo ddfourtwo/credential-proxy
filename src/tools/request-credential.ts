@@ -31,7 +31,7 @@ export const requestCredentialTool = {
       commands: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Allowed command patterns for exec (e.g., ["git *"]). Optional.',
+        description: 'Allowed command patterns for exec (e.g., ["git *"]). Required if this credential will be used with proxy_exec — a secret with no command allowlist cannot be used in exec.',
       },
       overwrite: {
         type: 'boolean',

@@ -133,26 +133,42 @@ public func handleProxyExec(
             ))
         }
 
-        // Check command restrictions
-        if let allowedCommands = metadata.allowedCommands, !allowedCommands.isEmpty {
-            let allowed = allowedCommands.contains { pattern in
-                commandMatchesPattern(input.command, pattern)
-            }
-            if !allowed {
-                auditLogger.log(AuditEvent(
-                    type: .SECRET_BLOCKED,
-                    timestamp: ISO8601DateFormatter().string(from: Date()),
-                    secret: placeholder.name,
-                    reason: "COMMAND_NOT_ALLOWED"
-                ))
-                return .failure(ProxyExecError(
-                    error: .secretCommandBlocked,
-                    message: "Secret '\(placeholder.name)' cannot be used with command '\(input.command[0])'",
-                    secret: placeholder.name,
-                    requestedCommand: input.command.joined(separator: " "),
-                    allowedCommands: allowedCommands
-                ))
-            }
+        // A secret used in exec MUST declare an explicit command allowlist. Without
+        // one, the agent could run any command (e.g. `sh -c 'echo {{SECRET}} | base64'`)
+        // and exfiltrate the value in an encoded form that output redaction cannot catch.
+        guard let allowedCommands = metadata.allowedCommands, !allowedCommands.isEmpty else {
+            auditLogger.log(AuditEvent(
+                type: .SECRET_BLOCKED,
+                timestamp: ISO8601DateFormatter().string(from: Date()),
+                secret: placeholder.name,
+                reason: "COMMAND_NOT_ALLOWED"
+            ))
+            return .failure(ProxyExecError(
+                error: .secretCommandBlocked,
+                message: "Secret '\(placeholder.name)' has no command allowlist and cannot be used in proxy_exec. Add allowed command patterns (e.g. [\"git *\"]) via update_credential first.",
+                secret: placeholder.name,
+                requestedCommand: input.command.joined(separator: " "),
+                allowedCommands: []
+            ))
+        }
+
+        let allowed = allowedCommands.contains { pattern in
+            commandMatchesPattern(input.command, pattern)
+        }
+        if !allowed {
+            auditLogger.log(AuditEvent(
+                type: .SECRET_BLOCKED,
+                timestamp: ISO8601DateFormatter().string(from: Date()),
+                secret: placeholder.name,
+                reason: "COMMAND_NOT_ALLOWED"
+            ))
+            return .failure(ProxyExecError(
+                error: .secretCommandBlocked,
+                message: "Secret '\(placeholder.name)' cannot be used with command '\(input.command[0])'",
+                secret: placeholder.name,
+                requestedCommand: input.command.joined(separator: " "),
+                allowedCommands: allowedCommands
+            ))
         }
     }
 

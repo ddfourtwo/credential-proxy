@@ -143,6 +143,16 @@ public enum RequestHandler {
             }
         }
 
+        // Injecting reverse proxy: backends point base_url here with no key; the
+        // credential is injected server-side and only ever travels to an allowlisted
+        // host. Same trust model as /proxy (domain allowlist, no mgmt token), so a
+        // headless daemon-launched backend can reach it without a human step.
+        for injectMethod in ["GET", "POST", "PUT", "PATCH", "DELETE"] {
+            router.route(injectMethod, "/inject/:secret/:host/*") { request in
+                await handleInjectProxy(request, secretStore: secretStore, auditLogger: auditLogger)
+            }
+        }
+
         router.route("POST", "/request-credential") { request in
             guard let handler = requestCredentialHandler else {
                 return .error(501, "Not available in headless mode")
@@ -185,6 +195,15 @@ public enum RequestHandler {
                 SecretPlacement(rawValue: $0)
             }
 
+            // Overwriting an existing credential clobbers its stored value; gate that
+            // with a live human step. Creating a brand-new credential stays friction-free.
+            let alreadyExists = ((try? await secretStore.getSecretMetadata(name: name)) ?? nil) != nil
+            if alreadyExists {
+                guard await DeviceAuth.require(reason: "Overwrite credential \"\(name)\"") else {
+                    return .error(401, "Device authentication required to overwrite an existing credential")
+                }
+            }
+
             do {
                 let result = try await secretStore.addSecret(
                     name: name,
@@ -213,6 +232,12 @@ public enum RequestHandler {
                 return .error(400, "Missing credential name")
             }
 
+            // Deleting an existing credential is destructive; require a live human step
+            // so a same-user process holding the mgmt token cannot silently tamper.
+            guard await DeviceAuth.require(reason: "Delete credential \"\(name)\"") else {
+                return .error(401, "Device authentication required to delete a credential")
+            }
+
             do {
                 let removed = try await secretStore.removeSecret(name: name)
                 if !removed {
@@ -233,6 +258,15 @@ public enum RequestHandler {
                 return .error(400, "Missing credential name")
             }
 
+            // Revealing a plaintext value requires a live human step, enforced here
+            // in the server so it applies to every caller — not just the GUI, which
+            // performs its own Touch ID check but shares the mgmt token with any
+            // same-user process (agent CLI, raw curl) that could otherwise read secrets.
+            let authorized = await DeviceAuth.require(reason: "Reveal credential \"\(name)\"")
+            guard authorized else {
+                return .error(401, "Device authentication required to reveal a credential")
+            }
+
             do {
                 guard let value = try await secretStore.getSecret(name: name) else {
                     return .error(404, "Secret \"\(name)\" not found")
@@ -241,7 +275,7 @@ public enum RequestHandler {
                     type: .SECRET_USED,
                     timestamp: ISO8601DateFormatter().string(from: Date()),
                     secret: name,
-                    reason: "revealed via GUI"
+                    reason: "revealed after device auth"
                 ))
                 return .json(200, ["name": AnyCodableValue.string(name), "value": AnyCodableValue.string(value)])
             } catch {
@@ -271,6 +305,12 @@ public enum RequestHandler {
 
             guard let value = parsed.value, !value.isEmpty else {
                 return .error(400, "value is required")
+            }
+
+            // Rotating overwrites the stored value of an existing credential; require a
+            // live human step so a token-holding process cannot silently replace secrets.
+            guard await DeviceAuth.require(reason: "Rotate credential \"\(name)\"") else {
+                return .error(401, "Device authentication required to rotate a credential")
             }
 
             do {

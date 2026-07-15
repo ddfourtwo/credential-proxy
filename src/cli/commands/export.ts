@@ -1,6 +1,8 @@
 import { Command } from 'commander';
 import { writeFile } from 'node:fs/promises';
+import { stdin } from 'node:process';
 import { cliListSecrets, cliGetSecret } from '../../cli/app-client.js';
+import { confirm } from '../utils.js';
 
 interface ExportedSecret {
   name: string;
@@ -25,9 +27,21 @@ export const exportCommand = new Command('export')
       console.error('Error: either <file> argument or --stdout is required');
       process.exit(1);
     }
+
+    // Exporting writes every secret in plaintext. Require an interactive human
+    // confirmation so an agent running non-interactively cannot silently dump them.
+    if (!stdin.isTTY) {
+      console.error('Error: export requires an interactive terminal (it exposes decrypted secrets). Refusing in a non-interactive session.');
+      process.exit(1);
+    }
+    if (!await confirm('This will write ALL secrets in DECRYPTED plaintext. Continue?')) {
+      console.log('Aborted.');
+      return;
+    }
+
     try {
       const secrets = await cliListSecrets();
-      
+
       if (secrets.length === 0) {
         console.log('No secrets to export.');
         return;
